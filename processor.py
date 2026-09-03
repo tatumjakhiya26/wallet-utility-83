@@ -1,41 +1,38 @@
-import logging
 import re
 
-# Configure logging for wallet transactions
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+ADDRESS_PATTERN = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
 
-def is_valid_address(address: str) -> bool:
-    """Validate cryptocurrency wallet address format."""
-    return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
+def validate_address(address: str) -> bool:
+    """Verify ethereum-style address format."""
+    return bool(ADDRESS_PATTERN.match(address))
 
-def process_transaction(data: dict):
-    """Process validated transaction data."""
-    addr = data.get('address', '')
-    amount = data.get('amount', 0)
-
-    if not is_valid_address(addr):
-        logger.warning(f"Invalid address format: {addr}")
-        return False
+def process_wallet_data(wallet_list: list):
+    """Main processing loop with input validation."""
+    valid_wallets = []
     
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        logger.warning(f"Invalid transaction amount: {amount}")
-        return False
-
-    logger.info(f"Processing {amount} units to {addr}")
-    return True
-
-def run_main_loop(queue):
-    """Main processing loop for wallet operations."""
-    while True:
-        try:
-            tx = queue.get()
-            if not tx:
-                break
+    for entry in wallet_list:
+        address = entry.get('address')
+        amount = entry.get('amount')
+        
+        # Validation logic
+        if not isinstance(address, str) or not validate_address(address):
+            print(f'Skipping invalid address: {address}')
+            continue
             
-            if process_transaction(tx):
-                logger.info("Transaction successfully dispatched")
-            else:
-                logger.error("Transaction validation failed")
-        except Exception as e:
-            logger.error(f"Critical processing error: {e}")
+        if not isinstance(amount, (int, float)) or amount < 0:
+            print(f'Skipping invalid amount: {amount}')
+            continue
+            
+        # Process sanitized data
+        valid_wallets.append({'address': address.lower(), 'amount': float(amount)})
+        
+    return valid_wallets
+
+if __name__ == '__main__':
+    data = [
+        {'address': '0x1234567890123456789012345678901234567890', 'amount': 1.5},
+        {'address': 'invalid_address', 'amount': 10},
+        {'address': '0xABCDEF1234567890ABCDEF1234567890ABCDEF12', 'amount': -5}
+    ]
+    results = process_wallet_data(data)
+    print(f'Processed {len(results)} valid wallets.')
