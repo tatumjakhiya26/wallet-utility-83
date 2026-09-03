@@ -1,44 +1,38 @@
-import re
-from functools import lru_cache
-from typing import List, Dict
+import time
+import logging
+from functools import wraps
+from typing import Callable, Any, Tuple, Type
 
-# Precompiled regex patterns for improved performance
-ETH_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
-BTC_PATTERN = re.compile(r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,39}$')
+logger = logging.getLogger("wallet_utility.validators")
 
-@lru_cache(maxsize=128)
-def is_valid_eth_address(address: str) -> bool:
-    """Validate Ethereum wallet address format.
-    Caching avoids recomputation for same inputs.
+def retry_on_failure(
+    retries: int = 3,
+    backoff_in_seconds: float = 1.0,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,)
+) -> Callable:
     """
-    if not isinstance(address, str):
-        return False
-    return ETH_PATTERN.match(address) is not None
-
-@lru_cache(maxsize=128)
-def is_valid_btc_address(address: str) -> bool:
-    """Validate Bitcoin wallet address format.
-    Uses cache for performance in high-volume checks.
+    Decorator to retry a function call if specified exceptions are raised.
+    Uses exponential backoff for network operations resilience.
     """
-    if not isinstance(address, str):
-        return False
-    return BTC_PATTERN.match(address) is not None
-
-def batch_validate(addresses: List[str], chain: str = "eth") -> Dict[str, bool]:
-    """Batch validate multiple addresses efficiently.
-    Leverages cached validators to speed up.
-    """
-    if chain == "eth":
-        validator = is_valid_eth_address
-    elif chain == "btc":
-        validator = is_valid_btc_address
-    else:
-        raise ValueError(f"Unsupported chain: {chain}")
-    return {addr: validator(addr) for addr in addresses}
-
-def filter_valid_addresses(addresses: List[str], chain: str = "eth") -> List[str]:
-    """Filter to only valid addresses.
-    Optimized batch processing reduces overhead.
-    """
-    validated = batch_validate(addresses, chain)
-    return [addr for addr, is_valid in validated.items() if is_valid]
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempt = 0
+            delay = backoff_in_seconds
+            while attempt < retries:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    attempt += 1
+                    if attempt >= retries:
+                        logger.error(f"Function {func.__name__} failed after {retries} attempts.")
+                        raise e
+                    logger.warning(
+                        f"Retrying {func.__name__} due to {e.__class__.__name__}: {e}. "
+                        f"Attempt {attempt}/{retries}. Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+                    delay *= 2
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
