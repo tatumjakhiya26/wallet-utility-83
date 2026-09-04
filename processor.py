@@ -1,38 +1,23 @@
-import re
+from decimal import Decimal, ROUND_HALF_UP
 
-ADDRESS_PATTERN = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
+def format_crypto_amount(amount: float, precision: int = 8) -> str:
+    """Converts float to string with specific decimal precision."""
+    return str(Decimal(str(amount)).quantize(Decimal(f"1.{'0' * precision}"), rounding=ROUND_HALF_UP))
 
-def validate_address(address: str) -> bool:
-    """Verify ethereum-style address format."""
-    return bool(ADDRESS_PATTERN.match(address))
+def validate_address_format(address: str, chain: str) -> bool:
+    """Basic validation for crypto address prefixes."""
+    prefixes = {
+        "btc": "1",
+        "eth": "0x",
+        "sol": "1"
+    }
+    expected = prefixes.get(chain.lower())
+    return address.startswith(expected) if expected else False
 
-def process_wallet_data(wallet_list: list):
-    """Main processing loop with input validation."""
-    valid_wallets = []
-    
-    for entry in wallet_list:
-        address = entry.get('address')
-        amount = entry.get('amount')
-        
-        # Validation logic
-        if not isinstance(address, str) or not validate_address(address):
-            print(f'Skipping invalid address: {address}')
-            continue
-            
-        if not isinstance(amount, (int, float)) or amount < 0:
-            print(f'Skipping invalid amount: {amount}')
-            continue
-            
-        # Process sanitized data
-        valid_wallets.append({'address': address.lower(), 'amount': float(amount)})
-        
-    return valid_wallets
+def calculate_fee(amount: float, rate: float) -> Decimal:
+    """Calculates network fee based on rate percentage."""
+    return Decimal(str(amount)) * Decimal(str(rate))
 
-if __name__ == '__main__':
-    data = [
-        {'address': '0x1234567890123456789012345678901234567890', 'amount': 1.5},
-        {'address': 'invalid_address', 'amount': 10},
-        {'address': '0xABCDEF1234567890ABCDEF1234567890ABCDEF12', 'amount': -5}
-    ]
-    results = process_wallet_data(data)
-    print(f'Processed {len(results)} valid wallets.')
+def sanitize_tx_hash(tx_hash: str) -> str:
+    """Normalizes transaction hash strings."""
+    return tx_hash.strip().lower()
