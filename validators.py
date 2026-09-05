@@ -1,38 +1,43 @@
-import time
-import logging
-from functools import wraps
-from typing import Callable, Any, Tuple, Type
+import re
+from typing import Optional
 
-logger = logging.getLogger("wallet_utility.validators")
+class AddressValidationError(Exception):
+    """Raised when a cryptocurrency address format is invalid."""
+    pass
 
-def retry_on_failure(
-    retries: int = 3,
-    backoff_in_seconds: float = 1.0,
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,)
-) -> Callable:
+def validate_crypto_address(address: str, chain_type: str = 'btc') -> bool:
     """
-    Decorator to retry a function call if specified exceptions are raised.
-    Uses exponential backoff for network operations resilience.
+    Validates cryptocurrency address formats using regex patterns.
+    Raises AddressValidationError for malformed inputs.
     """
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempt = 0
-            delay = backoff_in_seconds
-            while attempt < retries:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    attempt += 1
-                    if attempt >= retries:
-                        logger.error(f"Function {func.__name__} failed after {retries} attempts.")
-                        raise e
-                    logger.warning(
-                        f"Retrying {func.__name__} due to {e.__class__.__name__}: {e}. "
-                        f"Attempt {attempt}/{retries}. Retrying in {delay}s..."
-                    )
-                    time.sleep(delay)
-                    delay *= 2
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+    if not isinstance(address, str) or not address:
+        raise AddressValidationError("Address must be a non-empty string")
+
+    patterns = {
+        'btc': r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$',
+        'eth': r'^0x[a-fA-F0-9]{40}$'
+    }
+
+    pattern = patterns.get(chain_type.lower())
+    if not pattern:
+        raise ValueError(f"Unsupported chain type: {chain_type}")
+
+    try:
+        if not re.match(pattern, address):
+            raise AddressValidationError(f"Invalid {chain_type} address format")
+    except re.error as e:
+        raise AddressValidationError(f"Regex engine failure: {e}")
+
+    return True
+
+def sanitize_amount(amount: str) -> float:
+    """
+    Safely parses string amounts to float, handling malformed numeric input.
+    """
+    try:
+        value = float(amount)
+        if value < 0:
+            raise ValueError("Negative amount provided")
+        return value
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid numeric input: {e}")
