@@ -1,45 +1,49 @@
 import os
-import re
-from typing import Dict, Any
+import json
+from typing import Dict, Any, Optional
 
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "network": "mainnet",
+    "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
+    "request_timeout": 30,
+    "max_retries": 3,
+    "gas_limit_multiplier": 1.15,
+    "enable_metrics": False,
+    "cache_ttl_seconds": 300,
+}
 
-class ConfigError(Exception):
-    """Custom exception raised for configuration loading errors."""
-    pass
+class ConfigLoader:
+    """Loads configuration from environment variables or JSON file with fallback defaults."""
 
+    def __init__(self, config_path: Optional[str] = None):
+        self.config_path = config_path or os.getenv("WALLET_CONFIG_PATH")
+        self._config = DEFAULT_CONFIG.copy()
+        self._load()
 
-class WalletConfig:
-    """Manages configuration settings and validates edge cases for wallet utility."""
+    def _load(self) -> None:
+        # Load settings from JSON configuration file if it exists
+        if self.config_path and os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    file_config = json.load(f)
+                    self._config.update(file_config)
+            except (json.JSONDecodeError, OSError) as err:
+                print(f"Warning: Failed to load config file ({err}). Using defaults.")
 
-    SUPPORTED_NETWORKS = {"mainnet", "testnet", "devnet"}
+        # Environment variable overrides
+        env_rpc = os.getenv("WALLET_RPC_URL")
+        if env_rpc:
+            self._config["rpc_url"] = env_rpc
 
-    def __init__(self) -> None:
-        self.network: str = os.getenv("CRYPTO_NETWORK", "mainnet").lower()
-        self.rpc_url: str = os.getenv("RPC_URL", "https://localhost:8545")
-        self.timeout: int = self._parse_timeout(os.getenv("REQUEST_TIMEOUT", "30"))
-        self.validate()
+        env_network = os.getenv("WALLET_NETWORK")
+        if env_network:
+            self._config["network"] = env_network
 
-    def _parse_timeout(self, timeout_str: str) -> int:
-        try:
-            val = int(timeout_str)
-            if val <= 0:
-                raise ValueError("Timeout must be a positive integer.")
-            return val
-        except ValueError as err:
-            raise ConfigError(f"Invalid timeout value '{timeout_str}': {err}") from err
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a configuration value by key."""
+        return self._config.get(key, default)
 
-    def validate(self) -> None:
-        if self.network not in self.SUPPORTED_NETWORKS:
-            allowed = ", ".join(sorted(self.SUPPORTED_NETWORKS))
-            raise ConfigError(f"Unsupported network '{self.network}'. Must be one of: {allowed}")
-
-        url_pattern = re.compile(r"^https?://[^\s/$.?#].[^\s]*$", re.IGNORECASE)
-        if not url_pattern.match(self.rpc_url):
-            raise ConfigError(f"Malformed RPC URL provided: '{self.rpc_url}'")
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "network": self.network,
-            "rpc_url": self.rpc_url,
-            "timeout": self.timeout,
-        }
+    @property
+    def all_settings(self) -> Dict[str, Any]:
+        """Return a copy of the active configuration dictionary."""
+        return self._config.copy()
