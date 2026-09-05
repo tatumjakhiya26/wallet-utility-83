@@ -1,23 +1,27 @@
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
 
-def format_crypto_amount(amount: float, precision: int = 8) -> str:
-    """Converts float to string with specific decimal precision."""
-    return str(Decimal(str(amount)).quantize(Decimal(f"1.{'0' * precision}"), rounding=ROUND_HALF_UP))
+def format_crypto_amount(amount: str, decimals: int = 8) -> Decimal:
+    """Converts string amount to Decimal with specified precision."""
+    return Decimal(amount).quantize(Decimal(10)**-decimals, rounding=ROUND_HALF_UP)
 
-def validate_address_format(address: str, chain: str) -> bool:
-    """Basic validation for crypto address prefixes."""
-    prefixes = {
-        "btc": "1",
-        "eth": "0x",
-        "sol": "1"
-    }
-    expected = prefixes.get(chain.lower())
-    return address.startswith(expected) if expected else False
+def calculate_fee(amount: Decimal, fee_rate: float) -> Decimal:
+    """Calculates network fee based on percentage rate."""
+    fee = amount * Decimal(str(fee_rate))
+    return fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
 
-def calculate_fee(amount: float, rate: float) -> Decimal:
-    """Calculates network fee based on rate percentage."""
-    return Decimal(str(amount)) * Decimal(str(rate))
+def validate_address_format(address: str, prefix: str = '0x') -> bool:
+    """Basic validation for crypto address string format."""
+    if not address.startswith(prefix):
+        return False
+    return len(address) == 42
 
-def sanitize_tx_hash(tx_hash: str) -> str:
-    """Normalizes transaction hash strings."""
-    return tx_hash.strip().lower()
+def mask_address(address: str) -> str:
+    """Redacts middle of address for log safety."""
+    if len(address) < 10:
+        return "****"
+    return f"{address[:6]}...{address[-4:]}"
+
+def calculate_net_amount(amount: Decimal, fee: Decimal) -> Decimal:
+    """Subtracts fee from total transaction amount."""
+    return (amount - fee).max(Decimal('0'))
