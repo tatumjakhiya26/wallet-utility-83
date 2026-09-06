@@ -1,38 +1,31 @@
+import functools
 import time
-import urllib.request
-import urllib.error
-from functools import wraps
-from typing import Callable, Any, Type, Tuple
+from typing import Dict, Any
 
+# Cache dictionary to avoid redundant balance calculations
+_balance_cache: Dict[str, Any] = {}
+CACHE_TTL = 30
 
-def retry_network_op(
-    max_retries: int = 3,
-    backoff_factor: float = 1.5,
-    exceptions: Tuple[Type[BaseException], ...] = (urllib.error.URLError, TimeoutError),
-) -> Callable:
-    """Decorator to retry network requests with exponential backoff."""
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = 1.0
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as err:
-                    if attempt == max_retries:
-                        raise err
-                    time.sleep(delay)
-                    delay *= backoff_factor
-        return wrapper
-    return decorator
+def get_memoized_balance(wallet_id: str, fetch_func: callable) -> float:
+    """Fetches balance with simple TTL-based cache optimization."""
+    current_time = time.time()
+    
+    if wallet_id in _balance_cache:
+        data, timestamp = _balance_cache[wallet_id]
+        if current_time - timestamp < CACHE_TTL:
+            return data
+            
+    # Update cache with fresh data
+    balance = fetch_func(wallet_id)
+    _balance_cache[wallet_id] = (balance, current_time)
+    return balance
 
+def clear_cache() -> None:
+    """Clears local memory cache."""
+    _balance_cache.clear()
 
-@retry_network_op(max_retries=4, backoff_factor=2.0)
-def fetch_blockchain_data(endpoint_url: str) -> str:
-    """Fetch raw JSON payload from a remote blockchain API endpoint."""
-    req = urllib.request.Request(
-        endpoint_url,
-        headers={"User-Agent": "wallet-utility-83/1.0"}
-    )
-    with urllib.request.urlopen(req, timeout=10) as response:
-        return response.read().decode("utf-8")
+@functools.lru_cache(maxsize=128)
+def get_wallet_metadata(wallet_id: str) -> Dict[str, str]:
+    """Expensive metadata lookup optimized via LRU cache."""
+    # Simulating network latency or DB overhead
+    return {"id": wallet_id, "network": "mainnet", "status": "active"}
