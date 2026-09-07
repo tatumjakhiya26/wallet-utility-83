@@ -1,41 +1,40 @@
 import re
 from typing import Optional
 
-def validate_bitcoin_address(address: str) -> bool:
-    """Validate Bitcoin address format using regex.
+class AddressValidationError(Exception):
+    """Raised when a crypto address format is invalid."""
+    pass
 
-    Args:
-        address: The BTC address string to verify.
-
-    Returns:
-        bool: True if address is valid, False otherwise.
+def validate_wallet_address(address: str, chain_type: str = 'evm') -> bool:
     """
-    btc_pattern: str = r'^(1|3|bc1)[a-zA-Z0-9]{25,59}$'
-    return bool(re.match(btc_pattern, address))
-
-def validate_ethereum_address(address: str) -> bool:
-    """Validate Ethereum address format.
-
-    Args:
-        address: The ETH address string to verify.
-
-    Returns:
-        bool: True if address is valid, False otherwise.
+    Validates wallet address strings with specific regex patterns.
+    Raises AddressValidationError on empty inputs or pattern mismatch.
     """
-    eth_pattern: str = r'^0x[a-fA-F0-9]{40}$'
-    return bool(re.match(eth_pattern, address))
+    if not address or not isinstance(address, str):
+        raise AddressValidationError("Address must be a non-empty string")
 
-def sanitize_amount(amount: str) -> Optional[float]:
-    """Convert string amount to float safely.
+    patterns = {
+        'evm': r'^0x[a-fA-F0-9]{40}$',
+        'btc': r'^(1|3|bc1)[a-zA-Z0-9]{25,39}$'
+    }
 
-    Args:
-        amount: Numeric string representation.
+    pattern = patterns.get(chain_type.lower())
+    if not pattern:
+        raise ValueError(f"Unsupported chain type: {chain_type}")
 
-    Returns:
-        float value if valid, None if conversion fails.
+    if not re.match(pattern, address):
+        raise AddressValidationError(f"Invalid {chain_type} address format")
+
+    return True
+
+def sanitize_amount(amount: str) -> float:
+    """
+    Converts string amount to float with boundary error handling.
     """
     try:
-        value: float = float(amount)
-        return value if value >= 0 else None
-    except (ValueError, TypeError):
-        return None
+        value = float(amount)
+        if value < 0:
+            raise ValueError("Negative amount provided")
+        return value
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid numerical amount: {e}")
