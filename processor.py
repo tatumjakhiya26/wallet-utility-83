@@ -1,27 +1,26 @@
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+import hashlib
+import re
 
-def format_crypto_amount(amount: str, decimals: int = 8) -> Decimal:
-    """Converts string amount to Decimal with specified precision."""
-    return Decimal(amount).quantize(Decimal(10)**-decimals, rounding=ROUND_HALF_UP)
-
-def calculate_fee(amount: Decimal, fee_rate: float) -> Decimal:
-    """Calculates network fee based on percentage rate."""
-    fee = amount * Decimal(str(fee_rate))
-    return fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
-
-def validate_address_format(address: str, prefix: str = '0x') -> bool:
-    """Basic validation for crypto address string format."""
-    if not address.startswith(prefix):
+def validate_ethereum_address(address: str) -> bool:
+    """Validates if the given string is a valid Ethereum address format."""
+    if not isinstance(address, str):
         return False
-    return len(address) == 42
+    return bool(re.match(r"^(0x)?[0-9a-fA-F]{40}$", address))
 
-def mask_address(address: str) -> str:
-    """Redacts middle of address for log safety."""
-    if len(address) < 10:
-        return "****"
-    return f"{address[:6]}...{address[-4:]}"
+def validate_bitcoin_address(address: str) -> bool:
+    """Validates if the given string matches basic legacy Bitcoin address patterns."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
 
-def calculate_net_amount(amount: Decimal, fee: Decimal) -> Decimal:
-    """Subtracts fee from total transaction amount."""
-    return (amount - fee).max(Decimal('0'))
+def eth_to_wei(eth_amount: float) -> int:
+    """Converts Ethereum amount to Wei."""
+    return int(eth_amount * 10**18)
+
+def wei_to_eth(wei_amount: int) -> float:
+    """Converts Wei amount to Ethereum."""
+    return float(wei_amount) / 10**18
+
+def sha256_hash(data: str) -> str:
+    """Returns the SHA-256 hash of the input string."""
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()
