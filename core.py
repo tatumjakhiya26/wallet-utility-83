@@ -1,31 +1,32 @@
-import functools
-import time
-from typing import Dict, Any
+import hashlib
+import secrets
 
-# Cache dictionary to avoid redundant balance calculations
-_balance_cache: Dict[str, Any] = {}
-CACHE_TTL = 30
+def generate_wallet_key() -> str:
+    """Generates a cryptographically secure hex wallet key."""
+    return secrets.token_hex(32)
 
-def get_memoized_balance(wallet_id: str, fetch_func: callable) -> float:
-    """Fetches balance with simple TTL-based cache optimization."""
-    current_time = time.time()
-    
-    if wallet_id in _balance_cache:
-        data, timestamp = _balance_cache[wallet_id]
-        if current_time - timestamp < CACHE_TTL:
-            return data
-            
-    # Update cache with fresh data
-    balance = fetch_func(wallet_id)
-    _balance_cache[wallet_id] = (balance, current_time)
-    return balance
+def format_wei_to_eth(wei: int) -> float:
+    """Converts raw wei units to readable ether format."""
+    return wei / 10**18
 
-def clear_cache() -> None:
-    """Clears local memory cache."""
-    _balance_cache.clear()
+def calculate_tx_hash(data: str) -> str:
+    """Creates a SHA-256 hash for transaction tracking."""
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
-@functools.lru_cache(maxsize=128)
-def get_wallet_metadata(wallet_id: str) -> Dict[str, str]:
-    """Expensive metadata lookup optimized via LRU cache."""
-    # Simulating network latency or DB overhead
-    return {"id": wallet_id, "network": "mainnet", "status": "active"}
+def validate_address_format(address: str) -> bool:
+    """Checks basic ethereum-style address integrity."""
+    if not address.startswith('0x') or len(address) != 42:
+        return False
+    return all(c in '0123456789abcdefABCDEF' for c in address[2:])
+
+class WalletSession:
+    """Container for active wallet state operations."""
+    def __init__(self, wallet_id: str):
+        self.wallet_id = wallet_id
+        self.is_active = True
+
+    def get_status_summary(self) -> dict:
+        return {
+            "id": self.wallet_id,
+            "active": self.is_active
+        }
