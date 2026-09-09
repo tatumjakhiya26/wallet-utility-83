@@ -1,31 +1,44 @@
 import logging
-import sys
-from typing import Optional
+import os
+from logging.handlers import RotatingFileHandler
 
-class WalletLogger:
-    """Centralized logger for wallet-utility-83"""
-    def __init__(self, name: str = "wallet_util"):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+def setup_logger(
+    name: str = "wallet_utility",
+    log_file: str = "logs/wallet.log",
+    level: int = logging.INFO
+) -> logging.Logger:
+    """
+    Configures and returns a logger with console and rotating file outputs.
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-    def log_error(self, message: str, exc: Optional[Exception] = None) -> None:
-        """Handles logging with optional exception context"""
-        if exc:
-            self.logger.error(f"{message} | Error: {type(exc).__name__} | {str(exc)}")
-        else:
-            self.logger.error(message)
+    # Prevent adding handlers multiple times if logger already configured
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - [%(levelname)s] - %(message)s"
+        )
 
-    def safe_execute(self, func, *args, **kwargs):
-        """Wrapper to catch execution errors"""
-        try:
-            return func(*args, **kwargs)
-        except (ValueError, TypeError, ConnectionError) as e:
-            self.log_error(f"Execution failure in {func.__name__}", e)
-            return None
-        except Exception as e:
-            self.log_error("Critical unexpected failure", e)
-            raise
+        # Create directory for log file if it does not exist
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+
+        # Rotating file handler (rotates at 5MB, keeps last 5 logs)
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8"
+        )
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(level)
+        logger.addHandler(file_handler)
+
+        # Stream handler for console output
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(level)
+        logger.addHandler(console_handler)
+
+    return logger
