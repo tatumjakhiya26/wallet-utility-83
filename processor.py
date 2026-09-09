@@ -1,26 +1,56 @@
-import hashlib
 import re
+from typing import Dict, Any, List
 
-def validate_ethereum_address(address: str) -> bool:
-    """Validates if the given string is a valid Ethereum address format."""
+# Regex patterns for validation
+EVM_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
+
+def validate_evm_address(address: str) -> bool:
+    """Check if the address matches standard EVM 40-character hex pattern."""
     if not isinstance(address, str):
         return False
-    return bool(re.match(r"^(0x)?[0-9a-fA-F]{40}$", address))
+    return bool(EVM_ADDRESS_PATTERN.match(address))
 
-def validate_bitcoin_address(address: str) -> bool:
-    """Validates if the given string matches basic legacy Bitcoin address patterns."""
-    if not isinstance(address, str):
+def validate_amount(amount: Any) -> bool:
+    """Ensure the transaction amount is a positive number."""
+    try:
+        val = float(amount)
+        return val > 0
+    except (ValueError, TypeError):
         return False
-    return bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
 
-def eth_to_wei(eth_amount: float) -> int:
-    """Converts Ethereum amount to Wei."""
-    return int(eth_amount * 10**18)
+def process_transaction_queue(transactions: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
+    """
+    Main processing loop validating and filtering incoming transaction requests.
+    Returns categorized lists of successful and failed transaction processing.
+    """
+    processed_txs = []
+    failed_txs = []
 
-def wei_to_eth(wei_amount: int) -> float:
-    """Converts Wei amount to Ethereum."""
-    return float(wei_amount) / 10**18
+    for idx, tx in enumerate(transactions):
+        if not isinstance(tx, dict):
+            failed_txs.append({"index": idx, "error": "Invalid transaction format, expected dict"})
+            continue
 
-def sha256_hash(data: str) -> str:
-    """Returns the SHA-256 hash of the input string."""
-    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+        to_address = tx.get("to_address")
+        amount = tx.get("amount")
+        tx_id = tx.get("tx_id", f"unknown_{idx}")
+
+        # Validate receiver address
+        if not validate_evm_address(to_address):
+            failed_txs.append({"tx_id": tx_id, "error": f"Invalid destination address: {to_address}"})
+            continue
+
+        # Validate amount value
+        if not validate_amount(amount):
+            failed_txs.append({"tx_id": tx_id, "error": f"Invalid amount: {amount}"})
+            continue
+
+        # If validations pass, proceed to log successful preparation
+        processed_txs.append({
+            "tx_id": tx_id,
+            "to_address": to_address,
+            "amount": float(amount),
+            "status": "validated_and_ready"
+        })
+
+    return {"processed": processed_txs, "failed": failed_txs}
