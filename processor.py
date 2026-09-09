@@ -1,56 +1,47 @@
-import re
-from typing import Dict, Any, List
+import logging
+from typing import Dict
 
-# Regex patterns for validation
-EVM_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
+class CryptoError(Exception):
+    """Base exception for crypto wallet utilities."""
+    pass
 
-def validate_evm_address(address: str) -> bool:
-    """Check if the address matches standard EVM 40-character hex pattern."""
-    if not isinstance(address, str):
-        return False
-    return bool(EVM_ADDRESS_PATTERN.match(address))
+class InsufficientFundsError(CryptoError):
+    """Raised when the wallet balance is less than the transaction amount."""
+    pass
 
-def validate_amount(amount: Any) -> bool:
-    """Ensure the transaction amount is a positive number."""
-    try:
-        val = float(amount)
-        return val > 0
-    except (ValueError, TypeError):
-        return False
+class InvalidAddressError(CryptoError):
+    """Raised when a public key or wallet address fails validation."""
+    pass
 
-def process_transaction_queue(transactions: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
-    """
-    Main processing loop validating and filtering incoming transaction requests.
-    Returns categorized lists of successful and failed transaction processing.
-    """
-    processed_txs = []
-    failed_txs = []
+class TransactionProcessor:
+    """Handles secure transfer validation and balance updates for simulated assets."""
+    
+    def __init__(self, initial_balances: Dict[str, float]):
+        self.balances = initial_balances
+        self.logger = logging.getLogger("processor")
 
-    for idx, tx in enumerate(transactions):
-        if not isinstance(tx, dict):
-            failed_txs.append({"index": idx, "error": "Invalid transaction format, expected dict"})
-            continue
+    def validate_address(self, address: str) -> None:
+        """Validates standard hex address format."""
+        if not isinstance(address, str) or not address.startswith("0x") or len(address) != 42:
+            raise InvalidAddressError(f"Address '{address}' is not a valid hex address.")
 
-        to_address = tx.get("to_address")
-        amount = tx.get("amount")
-        tx_id = tx.get("tx_id", f"unknown_{idx}")
+    def transfer(self, sender: str, recipient: str, amount: float) -> str:
+        """Executes a secure transfer between two addresses with strict error handling."""
+        self.validate_address(sender)
+        self.validate_address(recipient)
 
-        # Validate receiver address
-        if not validate_evm_address(to_address):
-            failed_txs.append({"tx_id": tx_id, "error": f"Invalid destination address: {to_address}"})
-            continue
+        if amount <= 0:
+            raise ValueError("Transaction amount must be strictly greater than zero.")
 
-        # Validate amount value
-        if not validate_amount(amount):
-            failed_txs.append({"tx_id": tx_id, "error": f"Invalid amount: {amount}"})
-            continue
+        sender_balance = self.balances.get(sender, 0.0)
+        if sender_balance < amount:
+            raise InsufficientFundsError(
+                f"Insufficient funds at {sender}. Available: {sender_balance}, Requested: {amount}"
+            )
 
-        # If validations pass, proceed to log successful preparation
-        processed_txs.append({
-            "tx_id": tx_id,
-            "to_address": to_address,
-            "amount": float(amount),
-            "status": "validated_and_ready"
-        })
+        # Execution phase with double-entry safety
+        self.balances[sender] -= amount
+        self.balances[recipient] = self.balances.get(recipient, 0.0) + amount
 
-    return {"processed": processed_txs, "failed": failed_txs}
+        self.logger.info(f"Successfully transferred {amount} from {sender} to {recipient}")
+        return f"tx_hash_{hash((sender, recipient, amount))}"
