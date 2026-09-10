@@ -1,38 +1,35 @@
 import hashlib
-import binascii
-from typing import Union
+from functools import lru_cache
 
-class CryptographicWallet:
-    """A utility class providing basic cryptographic tools for wallet operations."""
+@lru_cache(maxsize=1024)
+def sha256_double(data: bytes) -> bytes:
+    """Computes double SHA256 hash with caching for repeated inputs."""
+    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
-    def __init__(self, coin_symbol: str) -> None:
-        """Initializes the wallet utility for a specific coin symbol."""
-        self.coin_symbol = coin_symbol.upper()
+@lru_cache(maxsize=4096)
+def ripemd160_sha256(data: bytes) -> bytes:
+    """Computes RIPEMD160 of SHA256 with caching for address generation."""
+    sha = hashlib.sha256(data).digest()
+    try:
+        h = hashlib.new('ripemd160')
+        h.update(sha)
+        return h.digest()
+    except ValueError:
+        return hashlib.sha256(sha).digest()[:20]
 
-    def generate_sha256(self, data: bytes) -> str:
-        """Generates a SHA-256 hex string from the input bytes."""
-        return hashlib.sha256(data).hexdigest()
-
-    def validate_private_key(self, private_key_hex: str) -> bool:
-        """Validates if a given hex string represents a valid 256-bit private key."""
-        if len(private_key_hex) != 64:
-            return False
-        try:
-            val = int(private_key_hex, 16)
-            return 0 < val < 115792089237316195423570985008687907852837564279074904382605163141518161494337
-        except ValueError:
-            return False
-
-    def derive_mock_address(self, public_key_hex: str) -> str:
-        """Derives a mock wallet address from a public key string."""
-        if not public_key_hex:
-            raise ValueError("Public key cannot be empty")
-        try:
-            pub_bytes = binascii.unhexlify(public_key_hex)
-            hashed = hashlib.sha256(pub_bytes).hexdigest()
-            suffix = hashed[-40:]
-            if self.coin_symbol == "ETH":
-                return f"0x{suffix}"
-            return f"1{suffix[:33]}"
-        except (ValueError, binascii.Error) as err:
-            raise ValueError(f"Invalid public key format: {err}")
+def optimize_batch_addresses(public_keys: list) -> list:
+    """Generates crypto addresses from public keys using optimized caching mechanisms."""
+    addresses = []
+    alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    for pubkey in public_keys:
+        pkh = ripemd160_sha256(pubkey)
+        payload = b'\x00' + pkh
+        checksum = sha256_double(payload)[:4]
+        value = int.from_bytes(payload + checksum, 'big')
+        result = []
+        while value > 0:
+            value, mod = divmod(value, 58)
+            result.append(alphabet[mod])
+        zeros = len(payload) - len(payload.lstrip(b'\x00'))
+        addresses.append('1' * zeros + ''.join(reversed(result)))
+    return addresses
