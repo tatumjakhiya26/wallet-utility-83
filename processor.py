@@ -1,47 +1,43 @@
+import time
 import logging
-from typing import Dict
+from typing import Callable, Any, Type, Tuple
 
-class CryptoError(Exception):
-    """Base exception for crypto wallet utilities."""
-    pass
+logger = logging.getLogger(__name__)
 
-class InsufficientFundsError(CryptoError):
-    """Raised when the wallet balance is less than the transaction amount."""
-    pass
+def retry_on_failure(
+    retries: int = 3,
+    delay: float = 1.0,
+    backoff: float = 2.0,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,)
+) -> Callable:
+    """
+    Decorator to retry network operations with exponential backoff.
+    """
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempt_delay = delay
+            for attempt in range(1, retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == retries:
+                        logger.error(f"Failed after {retries} attempts: {e}")
+                        raise
+                    logger.warning(
+                        f"Attempt {attempt}/{retries} failed: {e}. "
+                        f"Retrying in {attempt_delay:.1f}s..."
+                    )
+                    time.sleep(attempt_delay)
+                    attempt_delay *= backoff
+        return wrapper
+    return decorator
 
-class InvalidAddressError(CryptoError):
-    """Raised when a public key or wallet address fails validation."""
-    pass
-
-class TransactionProcessor:
-    """Handles secure transfer validation and balance updates for simulated assets."""
-    
-    def __init__(self, initial_balances: Dict[str, float]):
-        self.balances = initial_balances
-        self.logger = logging.getLogger("processor")
-
-    def validate_address(self, address: str) -> None:
-        """Validates standard hex address format."""
-        if not isinstance(address, str) or not address.startswith("0x") or len(address) != 42:
-            raise InvalidAddressError(f"Address '{address}' is not a valid hex address.")
-
-    def transfer(self, sender: str, recipient: str, amount: float) -> str:
-        """Executes a secure transfer between two addresses with strict error handling."""
-        self.validate_address(sender)
-        self.validate_address(recipient)
-
-        if amount <= 0:
-            raise ValueError("Transaction amount must be strictly greater than zero.")
-
-        sender_balance = self.balances.get(sender, 0.0)
-        if sender_balance < amount:
-            raise InsufficientFundsError(
-                f"Insufficient funds at {sender}. Available: {sender_balance}, Requested: {amount}"
-            )
-
-        # Execution phase with double-entry safety
-        self.balances[sender] -= amount
-        self.balances[recipient] = self.balances.get(recipient, 0.0) + amount
-
-        self.logger.info(f"Successfully transferred {amount} from {sender} to {recipient}")
-        return f"tx_hash_{hash((sender, recipient, amount))}"
+@retry_on_failure(retries=3, delay=1.0, backoff=2.0)
+def fetch_api_data(url: str) -> str:
+    """
+    Fetches remote data with configured retry attempts.
+    """
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "wallet-utility-83"})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return response.read().decode("utf-8")
