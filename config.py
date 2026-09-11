@@ -1,34 +1,37 @@
 import os
-import json
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
-    "network": "mainnet",
-    "rpc_url": "https://api.mainnet-beta.solana.com",
-    "timeout": 30,
-    "retry_attempts": 3
+    "NETWORK": "mainnet",
+    "RPC_TIMEOUT": 30,
+    "MAX_RETRIES": 3,
+    "KEYSTORE_PATH": "./data/keys",
+    "ENABLE_AUTO_SYNC": True
 }
 
-def load_config(path: str = "config.json") -> Dict[str, Any]:
-    """
-    Load configuration from file or return defaults if missing.
-    """
+def load_config(overrides: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Merges default configuration with environment variables and manual overrides."""
     config = DEFAULT_CONFIG.copy()
     
-    if not os.path.exists(path):
-        return config
-
-    try:
-        with open(path, "r") as f:
-            user_config = json.load(f)
-            config.update(user_config)
-    except (json.JSONDecodeError, IOError):
-        pass
+    # Check environment variables for config values
+    for key in config:
+        env_val = os.getenv(f"WALLET_{key}")
+        if env_val is not None:
+            # Handle type casting for expected types
+            if isinstance(config[key], int):
+                config[key] = int(env_val)
+            elif isinstance(config[key], bool):
+                config[key] = env_val.lower() in ("true", "1", "yes")
+            else:
+                config[key] = env_val
+    
+    # Apply manual dictionary overrides if provided
+    if overrides:
+        config.update(overrides)
         
     return config
 
-class ConfigError(Exception):
-    """
-    Custom exception for configuration loading failures.
-    """
-    pass
+if __name__ == "__main__":
+    # Demonstrate loading process
+    current_config = load_config({"RPC_TIMEOUT": 45})
+    print(f"Loaded configuration: {current_config}")
