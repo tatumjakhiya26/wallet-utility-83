@@ -1,43 +1,44 @@
-"""
-Custom exception hierarchy for the wallet utility.
-Provides clear error contexts for crypto transactions, validation, and nodes.
-"""
+"""Custom exception classes for wallet utility operations."""
 
 class WalletError(Exception):
-    """Base exception for all wallet utility errors."""
-    def __init__(self, message: str):
+    """Base exception class for all crypto wallet errors."""
+    def __init__(self, message: str, code: int = 500):
         super().__init__(message)
         self.message = message
+        self.code = code
+
+    def to_dict(self) -> dict:
+        """Convert exception details to a dictionary format."""
+        return {"error": self.message, "code": self.code}
 
 
-class ValidationError(WalletError):
-    """Raised when input validation (addresses, keys, payloads) fails."""
-    pass
-
-
-class InvalidAddressError(ValidationError):
-    """Raised when a cryptocurrency address is malformed or invalid."""
-    def __init__(self, address: str, network: str, reason: str = "Malformed address"):
+class InvalidAddressError(WalletError):
+    """Raised when a crypto address fails format or checksum validation."""
+    def __init__(self, address: str, network: str = "unknown"):
+        msg = f"Invalid {network} wallet address format: '{address}'"
+        super().__init__(msg, code=400)
         self.address = address
         self.network = network
-        super().__init__(f"Invalid {network} address '{address}': {reason}")
 
 
-class InsufficientFundsError(WalletError):
-    """Raised when a wallet lacks enough balance to complete a transaction."""
-    def __init__(self, required: float, available: float, currency: str):
+class InsufficientBalanceError(WalletError):
+    """Raised when an account lacks funds for a transaction."""
+    def __init__(self, required: float, available: float, symbol: str):
+        msg = f"Insufficient {symbol} balance. Required: {required}, Available: {available}"
+        super().__init__(msg, code=402)
         self.required = required
         self.available = available
-        self.currency = currency
-        super().__init__(
-            f"Insufficient funds: required {required} {currency}, "
-            f"but only {available} {currency} is available (shortage of {required - available:.8f})"
-        )
+        self.symbol = symbol
 
 
-class NodeConnectionError(WalletError):
-    """Raised when connection to the blockchain node fails or times out."""
-    def __init__(self, endpoint: str, details: str = ""):
+class TransactionSigningError(WalletError):
+    """Raised when raw transaction signing fails."""
+    def __init__(self, details: str):
+        super().__init__(f"Failed to sign transaction: {details}", code=422)
+
+
+class NetworkRPCError(WalletError):
+    """Raised when communication with RPC node fails."""
+    def __init__(self, endpoint: str, status_code: int = 502):
+        super().__init__(f"RPC node failure at {endpoint}", code=status_code)
         self.endpoint = endpoint
-        suffix = f" Details: {details}" if details else ""
-        super().__init__(f"Failed to connect to blockchain node at {endpoint}.{suffix}")
