@@ -1,35 +1,33 @@
-import hashlib
-from functools import lru_cache
+import time
+import functools
+import logging
 
-@lru_cache(maxsize=1024)
-def sha256_double(data: bytes) -> bytes:
-    """Computes double SHA256 hash with caching for repeated inputs."""
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
+logger = logging.getLogger(__name__)
 
-@lru_cache(maxsize=4096)
-def ripemd160_sha256(data: bytes) -> bytes:
-    """Computes RIPEMD160 of SHA256 with caching for address generation."""
-    sha = hashlib.sha256(data).digest()
-    try:
-        h = hashlib.new('ripemd160')
-        h.update(sha)
-        return h.digest()
-    except ValueError:
-        return hashlib.sha256(sha).digest()[:20]
+def retry_network_op(max_retries=3, delay=2):
+    """Decorator for retrying unstable network operations."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    attempts += 1
+                    if attempts == max_retries:
+                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
+                        raise
+                    time.sleep(delay * attempts)
+        return wrapper
+    return decorator
 
-def optimize_batch_addresses(public_keys: list) -> list:
-    """Generates crypto addresses from public keys using optimized caching mechanisms."""
-    addresses = []
-    alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-    for pubkey in public_keys:
-        pkh = ripemd160_sha256(pubkey)
-        payload = b'\x00' + pkh
-        checksum = sha256_double(payload)[:4]
-        value = int.from_bytes(payload + checksum, 'big')
-        result = []
-        while value > 0:
-            value, mod = divmod(value, 58)
-            result.append(alphabet[mod])
-        zeros = len(payload) - len(payload.lstrip(b'\x00'))
-        addresses.append('1' * zeros + ''.join(reversed(result)))
-    return addresses
+@retry_network_op(max_retries=3, delay=1)
+def fetch_balance(address):
+    # Simulated network call for crypto wallet balance
+    logger.info(f"Fetching balance for {address}")
+    return 0.0
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    fetch_balance("0xabc123")
