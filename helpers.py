@@ -1,34 +1,39 @@
 import re
+from typing import Optional
 
-def validate_address(address: str, chain: str) -> bool:
-    """Validate crypto address format based on network type."""
-    patterns = {
-        "eth": r"^0x[a-fA-F0-9]{40}$",
-        "btc": r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
-    }
-    pattern = patterns.get(chain.lower())
-    if not pattern:
+# regex for common evm address format
+ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
+
+def validate_address(address: str) -> bool:
+    """verify crypto wallet address format"""
+    if not address or not isinstance(address, str):
         return False
-    return bool(re.match(pattern, address))
+    return bool(ADDRESS_PATTERN.match(address))
 
 def validate_amount(amount: str) -> bool:
-    """Ensure input is a positive numerical string."""
+    """verify numeric precision for transactions"""
     try:
-        val = float(amount)
-        return val > 0
+        value = float(amount)
+        return value > 0
     except (ValueError, TypeError):
         return False
 
-def process_transaction_input(address: str, chain: str, amount: str) -> dict:
-    """Validate and structure user inputs for processing."""
-    if not validate_address(address, chain):
-        raise ValueError(f"Invalid {chain} address format")
+def sanitize_input(user_input: str) -> str:
+    """strip whitespace and normalize encoding"""
+    return str(user_input).strip()
+
+def process_transaction_input(address: str, amount: str) -> Optional[dict]:
+    """data validation gate for transaction processing"""
+    clean_address = sanitize_input(address)
+    clean_amount = sanitize_input(amount)
+
+    if not validate_address(clean_address):
+        return None
     
-    if not validate_amount(amount):
-        raise ValueError("Amount must be a positive number")
-        
+    if not validate_amount(clean_amount):
+        return None
+
     return {
-        "address": address.strip(),
-        "chain": chain.lower().strip(),
-        "amount": float(amount)
+        "address": clean_address,
+        "amount": float(clean_amount)
     }
