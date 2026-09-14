@@ -1,43 +1,32 @@
-import time
-import logging
-from typing import Callable, Any, Type, Tuple
+import decimal
+from typing import Dict, Optional
 
-logger = logging.getLogger(__name__)
+# wallet-utility-83: utility for crypto data handling
 
-def retry_on_failure(
-    retries: int = 3,
-    delay: float = 1.0,
-    backoff: float = 2.0,
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,)
-) -> Callable:
-    """
-    Decorator to retry network operations with exponential backoff.
-    """
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempt_delay = delay
-            for attempt in range(1, retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    if attempt == retries:
-                        logger.error(f"Failed after {retries} attempts: {e}")
-                        raise
-                    logger.warning(
-                        f"Attempt {attempt}/{retries} failed: {e}. "
-                        f"Retrying in {attempt_delay:.1f}s..."
-                    )
-                    time.sleep(attempt_delay)
-                    attempt_delay *= backoff
-        return wrapper
-    return decorator
+def normalize_amount(amount: str, decimals: int = 18) -> decimal.Decimal:
+    """Converts raw chain integer strings to decimal format."""
+    try:
+        factor = decimal.Decimal(10) ** decimals
+        return decimal.Decimal(amount) / factor
+    except (decimal.InvalidOperation, ValueError):
+        return decimal.Decimal('0')
 
-@retry_on_failure(retries=3, delay=1.0, backoff=2.0)
-def fetch_api_data(url: str) -> str:
-    """
-    Fetches remote data with configured retry attempts.
-    """
-    import urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "wallet-utility-83"})
-    with urllib.request.urlopen(req, timeout=10) as response:
-        return response.read().decode("utf-8")
+def format_crypto_value(value: decimal.Decimal, precision: int = 8) -> str:
+    """Formats decimal values for UI display."""
+    quantizer = decimal.Decimal('1.' + '0' * precision)
+    return str(value.quantize(quantizer, rounding=decimal.ROUND_HALF_UP))
+
+def extract_tx_metadata(raw_data: Dict) -> Dict[str, Optional[str]]:
+    """Parses core transaction fields from provider response."""
+    return {
+        'hash': raw_data.get('hash') or raw_data.get('tx_hash'),
+        'sender': raw_data.get('from', '').lower(),
+        'recipient': raw_data.get('to', '').lower(),
+        'status': 'confirmed' if raw_data.get('status') == 1 else 'pending'
+    }
+
+if __name__ == '__main__':
+    # Example usage for wallet-utility-83 context
+    raw_val = '1500000000000000000'
+    clean_val = normalize_amount(raw_val)
+    print(f"Normalized: {format_crypto_value(clean_val)}")
