@@ -1,62 +1,39 @@
 import json
-import hashlib
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any, Optional
 
-class TransactionHandler:
-    """Handles processing, signing, and verification of crypto wallet transactions."""
+class CryptoDataHandler:
+    """Utility class for wallet balance and unit calculations."""
 
-    def __init__(self, wallet_address: str, private_key: str) -> None:
-        """Initialize the transaction handler with wallet credentials."""
-        self.wallet_address = wallet_address
-        self._private_key = private_key
+    PRECISION = 8
 
-    def create_transaction(self, recipient: str, amount: float, fee: float) -> Dict[str, Any]:
-        """Create and format a standard transaction payload.
+    @staticmethod
+    def format_amount(amount: float) -> str:
+        """Convert float amount to string with 8-decimal precision."""
+        val = Decimal(str(amount))
+        return f"{val.quantize(Decimal('1.' + '0' * CryptoDataHandler.PRECISION), rounding=ROUND_HALF_UP)}"
 
-        Args:
-            recipient: The target wallet address.
-            amount: The amount of cryptocurrency to transfer.
-            fee: The transaction gas/network fee.
+    @staticmethod
+    def validate_tx_payload(data: Dict[str, Any]) -> bool:
+        """Verify basic transaction payload structure."""
+        required_fields = {'sender', 'receiver', 'amount', 'currency'}
+        return all(field in data for field in required_fields)
 
-        Returns:
-            A dictionary containing the unsigned transaction payload.
-        """
+    @classmethod
+    def sanitize_balance(cls, balance_data: Dict[str, Any]) -> Dict[str, str]:
+        """Normalize balance fields for API responses."""
         return {
-            "sender": self.wallet_address,
-            "recipient": recipient,
-            "amount": amount,
-            "fee": fee,
-            "nonce": 1
+            "address": str(balance_data.get("address", "")),
+            "balance": cls.format_amount(balance_data.get("amount", 0.0)),
+            "currency": str(balance_data.get("currency", "BTC").upper())
         }
 
-    def sign_transaction(self, tx_payload: Dict[str, Any]) -> str:
-        """Generate a mock cryptographic signature for the transaction.
-
-        Args:
-            tx_payload: The transaction payload to be signed.
-
-        Returns:
-            A hex string representing the transaction signature.
-        """
-        serialized_tx = json.dumps(tx_payload, sort_keys=True)
-        raw_signature = f"{serialized_tx}{self._private_key}"
-        return hashlib.sha256(raw_signature.encode('utf-8')).hexdigest()
-
-    def process_payment(self, recipient: str, amount: float, fee: float) -> Optional[Dict[str, Any]]:
-        """Execute transaction generation and signing sequence.
-
-        Args:
-            recipient: The destination wallet address.
-            amount: Transfer amount in cryptocurrency.
-            fee: Network transaction fee.
-
-        Returns:
-            The fully signed transaction payload, or None if validation fails.
-        """
-        if not recipient or amount <= 0 or fee < 0:
-            return None
-
-        tx = self.create_transaction(recipient, amount, fee)
-        signature = self.sign_transaction(tx)
-        tx["signature"] = signature
-        return tx
+def process_wallet_data(raw_input: str) -> Optional[Dict[str, str]]:
+    """Entry point for incoming crypto stream processing."""
+    try:
+        data = json.loads(raw_input)
+        if CryptoDataHandler.validate_tx_payload(data):
+            return CryptoDataHandler.sanitize_balance(data)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return None
