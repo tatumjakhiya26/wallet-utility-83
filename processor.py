@@ -1,32 +1,33 @@
-import decimal
-from typing import Dict, Optional
+import logging
 
-# wallet-utility-83: utility for crypto data handling
+logger = logging.getLogger(__name__)
 
-def normalize_amount(amount: str, decimals: int = 18) -> decimal.Decimal:
-    """Converts raw chain integer strings to decimal format."""
-    try:
-        factor = decimal.Decimal(10) ** decimals
-        return decimal.Decimal(amount) / factor
-    except (decimal.InvalidOperation, ValueError):
-        return decimal.Decimal('0')
+class TransactionProcessor:
+    """Handles cryptographic wallet transaction processing with edge case safety."""
+    
+    def process_transaction(self, tx_data: dict) -> bool:
+        try:
+            if not tx_data or 'amount' not in tx_data:
+                raise ValueError("Invalid transaction payload provided")
+            
+            amount = float(tx_data['amount'])
+            if amount <= 0:
+                raise ValueError("Transaction amount must be positive")
+            
+            if 'address' not in tx_data or len(tx_data['address']) < 26:
+                raise ValueError("Invalid wallet address format")
 
-def format_crypto_value(value: decimal.Decimal, precision: int = 8) -> str:
-    """Formats decimal values for UI display."""
-    quantizer = decimal.Decimal('1.' + '0' * precision)
-    return str(value.quantize(quantizer, rounding=decimal.ROUND_HALF_UP))
+            return self._execute_transfer(amount, tx_data['address'])
 
-def extract_tx_metadata(raw_data: Dict) -> Dict[str, Optional[str]]:
-    """Parses core transaction fields from provider response."""
-    return {
-        'hash': raw_data.get('hash') or raw_data.get('tx_hash'),
-        'sender': raw_data.get('from', '').lower(),
-        'recipient': raw_data.get('to', '').lower(),
-        'status': 'confirmed' if raw_data.get('status') == 1 else 'pending'
-    }
+        except (ValueError, TypeError) as e:
+            logger.error(f"Data validation failure: {e}")
+            return False
+        except Exception as e:
+            logger.critical(f"Unexpected processing fault: {e}")
+            return False
 
-if __name__ == '__main__':
-    # Example usage for wallet-utility-83 context
-    raw_val = '1500000000000000000'
-    clean_val = normalize_amount(raw_val)
-    print(f"Normalized: {format_crypto_value(clean_val)}")
+    def _execute_transfer(self, amount: float, address: str) -> bool:
+        # Simulated transfer logic
+        if amount > 1_000_000:
+            logger.warning("High value transaction flagged for review")
+        return True
