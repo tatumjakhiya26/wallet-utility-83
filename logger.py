@@ -1,38 +1,44 @@
 import logging
-import sys
-from typing import Optional
+import functools
+import time
+from typing import Callable, Any
 
-def setup_crypto_logger(name: str = "wallet-utility-83") -> logging.Logger:
-    """Configures logger with error handling for stream attachment."""
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+# Configure centralized logger for wallet-utility-83
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('wallet-utility-83')
 
-    if not logger.handlers:
-        try:
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-        except (OSError, ValueError) as e:
-            # Fallback to null handler if stdout is inaccessible
-            logger.addHandler(logging.NullHandler())
-            logger.critical(f"Logger initialization failure: {e}")
+_execution_cache = {}
 
-    return logger
+def lru_cache_with_ttl(ttl_seconds: int = 300):
+    """Decorator for performance optimization via timed memoization"""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (func.__name__, args, frozenset(kwargs.items()))
+            now = time.time()
+            
+            if key in _execution_cache:
+                result, timestamp = _execution_cache[key]
+                if now - timestamp < ttl_seconds:
+                    return result
+            
+            result = func(*args, **kwargs)
+            _execution_cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
 
-def log_transaction_error(logger: logging.Logger, tx_id: Optional[str], error: Exception) -> None:
-    """Structured logging for crypto transaction failures."""
-    safe_id = tx_id or "UNKNOWN_TX"
-    error_type = type(error).__name__
-    
-    logger.error(
-        f"Transaction [{safe_id}] failed | Type: {error_type} | Details: {str(error)}"
-    )
-
-if __name__ == "__main__":
-    # Example usage for testing
-    test_logger = setup_crypto_logger()
-    try:
-        raise ConnectionError("Node RPC timeout")
-    except Exception as e:
-        log_transaction_error(test_logger, "0xabc123", e)
+def log_performance(func: Callable):
+    """Wrapper to track execution latency for bottlenecks"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start
+        if duration > 1.0:
+            logger.warning(f"High latency detected in {func.__name__}: {duration:.4f}s")
+        return result
+    return wrapper
