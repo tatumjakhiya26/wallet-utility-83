@@ -1,25 +1,16 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 # wallet-utility-83
 
-`wallet-utility-83` is an asynchronous Python toolkit designed for high-throughput crypto wallet address validation and multi-chain balance monitoring. It provides developers with a unified interface to interact with EVM and Solana RPC nodes without relying on bulky external framework dependencies.
+`wallet-utility-83` is a lightweight Python toolkit designed for automated wallet address generation, balance monitoring, and transaction parsing. It streamlines interaction with EVM-compatible chains by abstracting complex RPC calls into simple, reusable functions.
 
-## Features
+### Features
+*   **Hierarchical Deterministic (HD) Wallet Generation:** Effortlessly derive multiple unique addresses and private keys using BIP-39 mnemonic seeds.
+*   **Real-time Balance Aggregation:** Query balances across multiple addresses simultaneously with integrated asynchronous HTTP requests to minimize latency.
+*   **Transaction Decoder:** Parse raw hexadecimal transaction data into human-readable JSON formats to verify contract interactions before signing.
+*   **Batch Export:** Securely export address-private key pairs into encrypted CSV files for archival or cold storage migration.
 
-* **Multi-Chain Address Validation:** Validates formatting, checksums, and network routing for EVM (ERC-20) and Solana (SPL) public keys.
-* **Concurrent RPC Querying:** Asynchronously fetches native token and contract balances across multiple network endpoints using `aiohttp`.
-* **Keypair Management:** Generates BIP-39 compliant seed phrases and creates password-encrypted JSON keyfiles locally.
-* **Fee Market Estimation:** Calculates real-time gas prices and priority fees to help schedule cost-efficient transactions.
+### Installation
 
-## Installation
-
-Install the package directly via `pip`:
-
-```bash
-pip install wallet-utility-83
-```
-
-Alternatively, build from source:
+Ensure you have Python 3.9+ installed. Clone the repository and install the required dependencies:
 
 ```bash
 git clone https://github.com/Developer/wallet-utility-83.git
@@ -27,25 +18,33 @@ cd wallet-utility-83
 pip install -r requirements.txt
 ```
 
-## Quick Start
+### Usage
+
+To generate a new mnemonic and derive the first five associated addresses, run the following:
 
 ```python
-import asyncio
-from wallet_utility_83 import MultiChainClient
+from utils import wallet_manager
 
-async def main():
-    client = MultiChainClient(
-        evm_rpc="https://eth.llamarpc.com",
-        solana_rpc="https://api.mainnet-beta.solana.com"
-    )
+# Generate a new master seed
+mnemonic = wallet_manager.generate_mnemonic()
+print(f"Seed Phrase: {mnemonic}")
 
-    # Check EVM address and fetch native balance
-    eth_address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
-    if client.is_valid_evm_address(eth_address):
-        eth_balance = await client.get_eth_balance(eth_address)
-        print(f"EVM Address: {eth_address}")
-        print(f"ETH Balance: {eth_balance:.4f} ETH")
+# Derive addresses
+wallets = wallet_manager.derive_wallets(mnemonic, count=5)
+for wallet in wallets:
+    print(f"Address: {wallet['address']} | Key: {wallet['private_key']}")
+```
 
-    # Fetch gas estimate
-    gas_price = await client.get_recommended_gas_price()
-    print(f"
+To check balances for a list of addresses on the Ethereum mainnet:
+
+```python
+addresses = ["0x...", "0x..."]
+balances = wallet_manager.get_batch_balances(addresses, provider_url="https://eth.llamarpc.com")
+print(balances)
+```
+
+### License
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
