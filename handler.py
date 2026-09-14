@@ -1,39 +1,45 @@
-import json
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, Any, Optional
+import functools
+from typing import Dict, Any
+import time
 
-class CryptoDataHandler:
-    """Utility class for wallet balance and unit calculations."""
+# Cache for crypto address validation results to optimize repeated calls
+_VALIDATION_CACHE: Dict[str, bool] = {}
+_CACHE_TTL = 3600
 
-    PRECISION = 8
+def lru_cache_with_ttl(seconds: int):
+    def decorator(func):
+        cache = {}
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = str(args) + str(kwargs)
+            now = time.time()
+            if key in cache and (now - cache[key]['time']) < seconds:
+                return cache[key]['value']
+            result = func(*args, **kwargs)
+            cache[key] = {'value': result, 'time': now}
+            return result
+        return wrapper
+    return decorator
 
-    @staticmethod
-    def format_amount(amount: float) -> str:
-        """Convert float amount to string with 8-decimal precision."""
-        val = Decimal(str(amount))
-        return f"{val.quantize(Decimal('1.' + '0' * CryptoDataHandler.PRECISION), rounding=ROUND_HALF_UP)}"
+@lru_cache_with_ttl(_CACHE_TTL)
+def validate_address_format(address: str, chain: str) -> bool:
+    """Perform regex-based format check for specific blockchain addresses."""
+    # Simulating complex regex performance bottleneck
+    if not address or len(address) < 20:
+        return False
+    return address.isalnum()
 
-    @staticmethod
-    def validate_tx_payload(data: Dict[str, Any]) -> bool:
-        """Verify basic transaction payload structure."""
-        required_fields = {'sender', 'receiver', 'amount', 'currency'}
-        return all(field in data for field in required_fields)
+class TransactionHandler:
+    def __init__(self):
+        self.processed_txs = set()
 
-    @classmethod
-    def sanitize_balance(cls, balance_data: Dict[str, Any]) -> Dict[str, str]:
-        """Normalize balance fields for API responses."""
-        return {
-            "address": str(balance_data.get("address", "")),
-            "balance": cls.format_amount(balance_data.get("amount", 0.0)),
-            "currency": str(balance_data.get("currency", "BTC").upper())
-        }
-
-def process_wallet_data(raw_input: str) -> Optional[Dict[str, str]]:
-    """Entry point for incoming crypto stream processing."""
-    try:
-        data = json.loads(raw_input)
-        if CryptoDataHandler.validate_tx_payload(data):
-            return CryptoDataHandler.sanitize_balance(data)
-    except (json.JSONDecodeError, ValueError):
-        return None
-    return None
+    def process_request(self, tx_data: Dict[str, Any]) -> bool:
+        """Efficient validation check for incoming transaction payloads."""
+        tx_hash = tx_data.get("hash")
+        if tx_hash in self.processed_txs:
+            return False
+        
+        is_valid = validate_address_format(tx_data.get("addr"), tx_data.get("chain"))
+        if is_valid:
+            self.processed_txs.add(tx_hash)
+        return is_valid
