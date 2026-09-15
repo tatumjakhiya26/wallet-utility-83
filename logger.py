@@ -1,28 +1,38 @@
 import logging
-import sys
-from typing import Optional
+import os
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
-# Configure logging for wallet-utility-83
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+LOG_DIR = Path("logs")
+LOG_FILE = LOG_DIR / "wallet.log"
+MAX_BYTES = 5 * 1024 * 1024
+BACKUP_COUNT = 3
 
-def get_wallet_logger(name: str) -> logging.Logger:
-    """Returns a configured logger instance for wallet modules."""
-    logger = logging.getLogger(f"wallet-utility-83.{name}")
+def setup_logger(name: str = "wallet-utility-83") -> logging.Logger:
+    """Initializes a rotating file logger for the application."""
+    LOG_DIR.mkdir(exist_ok=True)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+
+    # Prevent duplicate handlers if setup is called multiple times
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+
+        # File handler with rotation
+        file_handler = RotatingFileHandler(
+            LOG_FILE, 
+            maxBytes=MAX_BYTES, 
+            backupCount=BACKUP_COUNT
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        # Console handler for visibility during development
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
     return logger
-
-def log_transaction_status(tx_hash: str, status: str, error: Optional[str] = None) -> None:
-    """Utility for standardized transaction outcome logging."""
-    logger = get_wallet_logger("transaction")
-    if error:
-        logger.error(f"TX {tx_hash} failed: {error}")
-    else:
-        logger.info(f"TX {tx_hash} status: {status}")
-
-if __name__ == "__main__":
-    # Verification of logger functionality
-    test_logger = get_wallet_logger("test")
-    test_logger.info("Logger initialization successful")
