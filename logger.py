@@ -1,44 +1,28 @@
 import logging
-import functools
-import time
-from typing import Callable, Any
+import sys
+from typing import Optional
 
-# Configure centralized logger for wallet-utility-83
+# Configure logging for wallet-utility-83
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger('wallet-utility-83')
 
-_execution_cache = {}
+def get_wallet_logger(name: str) -> logging.Logger:
+    """Returns a configured logger instance for wallet modules."""
+    logger = logging.getLogger(f"wallet-utility-83.{name}")
+    return logger
 
-def lru_cache_with_ttl(ttl_seconds: int = 300):
-    """Decorator for performance optimization via timed memoization"""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (func.__name__, args, frozenset(kwargs.items()))
-            now = time.time()
-            
-            if key in _execution_cache:
-                result, timestamp = _execution_cache[key]
-                if now - timestamp < ttl_seconds:
-                    return result
-            
-            result = func(*args, **kwargs)
-            _execution_cache[key] = (result, now)
-            return result
-        return wrapper
-    return decorator
+def log_transaction_status(tx_hash: str, status: str, error: Optional[str] = None) -> None:
+    """Utility for standardized transaction outcome logging."""
+    logger = get_wallet_logger("transaction")
+    if error:
+        logger.error(f"TX {tx_hash} failed: {error}")
+    else:
+        logger.info(f"TX {tx_hash} status: {status}")
 
-def log_performance(func: Callable):
-    """Wrapper to track execution latency for bottlenecks"""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        duration = time.perf_counter() - start
-        if duration > 1.0:
-            logger.warning(f"High latency detected in {func.__name__}: {duration:.4f}s")
-        return result
-    return wrapper
+if __name__ == "__main__":
+    # Verification of logger functionality
+    test_logger = get_wallet_logger("test")
+    test_logger.info("Logger initialization successful")
