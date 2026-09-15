@@ -1,33 +1,56 @@
-import logging
+import re
+from typing import Dict, List, Any
 
-logger = logging.getLogger(__name__)
 
 class TransactionProcessor:
-    """Handles cryptographic wallet transaction processing with edge case safety."""
-    
-    def process_transaction(self, tx_data: dict) -> bool:
-        try:
-            if not tx_data or 'amount' not in tx_data:
-                raise ValueError("Invalid transaction payload provided")
-            
-            amount = float(tx_data['amount'])
-            if amount <= 0:
-                raise ValueError("Transaction amount must be positive")
-            
-            if 'address' not in tx_data or len(tx_data['address']) < 26:
-                raise ValueError("Invalid wallet address format")
+    """Processes incoming crypto transactions with strict input validation."""
 
-            return self._execute_transfer(amount, tx_data['address'])
+    ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+    SUPPORTED_CURRENCIES = {"BTC", "ETH", "USDT", "SOL"}
 
-        except (ValueError, TypeError) as e:
-            logger.error(f"Data validation failure: {e}")
-            return False
-        except Exception as e:
-            logger.critical(f"Unexpected processing fault: {e}")
+    def __init__(self, raw_queue: List[Dict[str, Any]]):
+        self.raw_queue = raw_queue
+        self.processed_items: List[Dict[str, Any]] = []
+        self.failed_items: List[Dict[str, Any]] = []
+
+    def validate_item(self, item: Dict[str, Any]) -> bool:
+        """Validates raw transaction dictionary structure and values."""
+        if not isinstance(item, dict):
             return False
 
-    def _execute_transfer(self, amount: float, address: str) -> bool:
-        # Simulated transfer logic
-        if amount > 1_000_000:
-            logger.warning("High value transaction flagged for review")
+        address = item.get("address")
+        amount = item.get("amount")
+        currency = item.get("currency")
+
+        if not address or not isinstance(address, str):
+            return False
+        if not self.ETH_ADDRESS_REGEX.match(address):
+            return False
+
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            return False
+
+        if not currency or currency.upper() not in self.SUPPORTED_CURRENCIES:
+            return False
+
         return True
+
+    def run() -> Dict[str, int]:
+        """Main processing loop that validates and dispatches transactions."""
+        for item in self.raw_queue:
+            if not self.validate_item(item):
+                self.failed_items.append({"item": item, "reason": "invalid_payload"})
+                continue
+
+            sanitized_item = {
+                "address": item["address"].lower(),
+                "amount": float(item["amount"]),
+                "currency": item["currency"].upper(),
+                "status": "validated"
+            }
+            self.processed_items.append(sanitized_item)
+
+        return {
+            "processed": len(self.processed_items),
+            "failed": len(self.failed_items)
+        }
