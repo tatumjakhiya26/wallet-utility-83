@@ -2,28 +2,20 @@ class WalletError(Exception):
     """Base exception for wallet-utility-83 operations."""
     pass
 
-class InsufficientFundsError(WalletError):
-    """Raised when account balance is too low."""
-    pass
+class InsufficientBalanceError(WalletError):
+    """Raised when transaction amount exceeds available balance."""
+    def __init__(self, required, available):
+        self.message = f"Required {required} but only {available} available"
+        super().__init__(self.message)
 
 class ConnectionTimeoutError(WalletError):
-    """Raised when network requests fail."""
+    """Raised when node connectivity fails after retries."""
     pass
 
-class InvalidAddressError(WalletError):
-    """Raised when wallet address format is incorrect."""
+class ValidationError(WalletError):
+    """Raised when input parameters fail address or format checks."""
     pass
 
-class TransactionSigningError(WalletError):
-    """Raised during cryptographic signing failures."""
+class SigningError(WalletError):
+    """Raised when cryptographic signing process fails."""
     pass
-
-class RateLimitExceededError(WalletError):
-    """Raised when API thresholds are breached."""
-    pass
-
-def handle_wallet_exception(err: Exception) -> str:
-    """Format custom wallet exceptions for logging."""
-    if isinstance(err, WalletError):
-        return f"[Wallet Error] {type(err).__name__}: {str(err)}"
-    return f"[Unexpected Error] {str(err)}"
