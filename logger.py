@@ -1,30 +1,31 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-class WalletLogger:
-    def __init__(self, name: str = 'wallet-utility-83'):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+def setup_logger(name: str = 'wallet-utility-83', log_file: str = 'wallet.log') -> logging.Logger:
+    """Configures a rotating file logger for crypto operations."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
 
-    def safe_log_error(self, message: str, context: Optional[dict] = None) -> None:
-        try:
-            log_payload = {'error': message, 'meta': context or {}}
-            self.logger.error(f'Critical failure: {log_payload}')
-        except Exception as e:
-            # fallback for serialization failures
-            sys.stderr.write(f'Logging failure: {str(e)}\n')
+    # Prevent duplicate handlers if re-initialized
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
 
-    def log_tx_attempt(self, tx_id: str, status: str) -> None:
-        try:
-            if not tx_id:
-                raise ValueError('Transaction ID missing')
-            self.logger.info(f'Transaction {tx_id} status updated to {status}')
-        except (ValueError, TypeError) as e:
-            self.safe_log_error('Invalid transaction metadata', {'error': str(e)})
-        except Exception:
-            self.safe_log_error('Unexpected logging error')
+        # Rotate at 5MB, keep 3 backup files
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=5 * 1024 * 1024, backupCount=3
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        # Console output for visibility during development
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+    return logger
+
+# Global logger instance for the utility
+logger = setup_logger()
