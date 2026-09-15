@@ -1,38 +1,30 @@
 import logging
-import os
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
+import sys
+from typing import Optional
 
-LOG_DIR = Path("logs")
-LOG_FILE = LOG_DIR / "wallet.log"
-MAX_BYTES = 5 * 1024 * 1024
-BACKUP_COUNT = 3
+class WalletLogger:
+    def __init__(self, name: str = 'wallet-utility-83'):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
 
-def setup_logger(name: str = "wallet-utility-83") -> logging.Logger:
-    """Initializes a rotating file logger for the application."""
-    LOG_DIR.mkdir(exist_ok=True)
+    def safe_log_error(self, message: str, context: Optional[dict] = None) -> None:
+        try:
+            log_payload = {'error': message, 'meta': context or {}}
+            self.logger.error(f'Critical failure: {log_payload}')
+        except Exception as e:
+            # fallback for serialization failures
+            sys.stderr.write(f'Logging failure: {str(e)}\n')
 
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    # Prevent duplicate handlers if setup is called multiple times
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-
-        # File handler with rotation
-        file_handler = RotatingFileHandler(
-            LOG_FILE, 
-            maxBytes=MAX_BYTES, 
-            backupCount=BACKUP_COUNT
-        )
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-        # Console handler for visibility during development
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
-    return logger
+    def log_tx_attempt(self, tx_id: str, status: str) -> None:
+        try:
+            if not tx_id:
+                raise ValueError('Transaction ID missing')
+            self.logger.info(f'Transaction {tx_id} status updated to {status}')
+        except (ValueError, TypeError) as e:
+            self.safe_log_error('Invalid transaction metadata', {'error': str(e)})
+        except Exception:
+            self.safe_log_error('Unexpected logging error')
