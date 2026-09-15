@@ -1,35 +1,23 @@
-from typing import Final, Dict
+from enum import Enum
 
-# Network identifier constants
-MAINNET: Final[str] = "mainnet"
-TESTNET: Final[str] = "testnet"
+class WalletErrorCodes(Enum):
+    INSUFFICIENT_FUNDS = "ERR_001"
+    INVALID_ADDRESS = "ERR_002"
+    NETWORK_TIMEOUT = "ERR_003"
+    DECRYPTION_FAILED = "ERR_004"
+    UNSUPPORTED_ASSET = "ERR_005"
 
-# Minimum requirement thresholds for wallet validation
-MIN_PASSWORD_LENGTH: Final[int] = 12
-GAS_LIMIT_DEFAULT: Final[int] = 21000
-
-# Map of crypto asset codes to their respective decimals
-ASSET_DECIMALS: Final[Dict[str, int]] = {
-    "BTC": 8,
-    "ETH": 18,
-    "USDT": 6,
-    "SOL": 9
+ERROR_MESSAGES = {
+    WalletErrorCodes.INSUFFICIENT_FUNDS: "Insufficient balance for transaction requirements",
+    WalletErrorCodes.INVALID_ADDRESS: "The provided wallet address format is invalid",
+    WalletErrorCodes.NETWORK_TIMEOUT: "Connection to blockchain node timed out",
+    WalletErrorCodes.DECRYPTION_FAILED: "Failed to unlock wallet with provided credentials",
+    WalletErrorCodes.UNSUPPORTED_ASSET: "Transaction currency not supported by current chain"
 }
 
-# API request configuration
-TIMEOUT_SECONDS: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
+MAX_RETRIES = 3
+DEFAULT_TIMEOUT_SECONDS = 30.0
 
-# Default derivation path for standard BIP32 wallets
-DEFAULT_DERIVATION_PATH: Final[str] = "m/44'/60'/0'/0/0"
-
-def get_asset_precision(symbol: str) -> int:
-    """Return decimal precision for a specific asset symbol."""
-    return ASSET_DECIMALS.get(symbol.upper(), 18)
-
-# Application-wide environment configuration
-SUPPORTED_NETWORKS: Final[tuple] = (MAINNET, TESTNET)
-ENVIRONMENT_FLAGS: Final[Dict[str, bool]] = {
-    "DEBUG": False,
-    "STRICT_MODE": True
-}
+def get_error_message(code: WalletErrorCodes) -> str:
+    """Return user-friendly error message for a specific code."""
+    return ERROR_MESSAGES.get(code, "An unknown wallet error occurred")
