@@ -1,56 +1,59 @@
-import re
-from typing import Dict, List, Any
-
+import concurrent.futures
+import hashlib
+from typing import List, Dict, Any, Tuple
 
 class TransactionProcessor:
-    """Processes incoming crypto transactions with strict input validation."""
+    '''
+    Optimized processor for handling bulk crypto transaction validations
+    and hashing using thread pools and efficient memory structures.
+    '''
+    def __init__(self, max_workers: int = 4):
+        self.max_workers = max_workers
 
-    ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
-    SUPPORTED_CURRENCIES = {"BTC", "ETH", "USDT", "SOL"}
+    @staticmethod
+    def compute_tx_hash(tx_data: bytes) -> str:
+        '''
+        Computes double SHA-256 hash for a raw transaction payload.
+        '''
+        first_sha = hashlib.sha256(tx_data).digest()
+        second_sha = hashlib.sha256(first_sha).digest()
+        return second_sha.hex()
 
-    def __init__(self, raw_queue: List[Dict[str, Any]]):
-        self.raw_queue = raw_queue
-        self.processed_items: List[Dict[str, Any]] = []
-        self.failed_items: List[Dict[str, Any]] = []
+    def process_batch(self, transactions: List[bytes]) -> List[str]:
+        '''
+        Parallelizes the hashing of bulk raw transactions to utilize multi-core CPUs.
+        '''
+        if not transactions:
+            return []
 
-    def validate_item(self, item: Dict[str, Any]) -> bool:
-        """Validates raw transaction dictionary structure and values."""
-        if not isinstance(item, dict):
-            return False
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = list(executor.map(self.compute_tx_hash, transactions))
+        return results
 
-        address = item.get("address")
-        amount = item.get("amount")
-        currency = item.get("currency")
+    def validate_and_hash_batch(self, payloads: List[Dict[str, Any]]) -> Tuple[List[str], List[int]]:
+        '''
+        Validates payload structure and computes tx hashes in parallel.
+        Returns a tuple of successful hashes and indices of failed payloads.
+        '''
+        valid_payloads = []
+        failed_indices = []
+        
+        for index, payload in enumerate(payloads):
+            raw_tx = payload.get('raw_tx')
+            if isinstance(raw_tx, bytes) and len(raw_tx) > 0:
+                valid_payloads.append((index, raw_tx))
+            else:
+                failed_indices.append(index)
 
-        if not address or not isinstance(address, str):
-            return False
-        if not self.ETH_ADDRESS_REGEX.match(address):
-            return False
+        if not valid_payloads:
+            return [], failed_indices
 
-        if not isinstance(amount, (int, float)) or amount <= 0:
-            return False
+        raw_bytes_list = [item[1] for item in valid_payloads]
+        hashes = self.process_batch(raw_bytes_list)
 
-        if not currency or currency.upper() not in self.SUPPORTED_CURRENCIES:
-            return False
+        final_hashes = [None] * len(payloads)
+        for (original_index, _), tx_hash in zip(valid_payloads, hashes):
+            final_hashes[original_index] = tx_hash
 
-        return True
-
-    def run() -> Dict[str, int]:
-        """Main processing loop that validates and dispatches transactions."""
-        for item in self.raw_queue:
-            if not self.validate_item(item):
-                self.failed_items.append({"item": item, "reason": "invalid_payload"})
-                continue
-
-            sanitized_item = {
-                "address": item["address"].lower(),
-                "amount": float(item["amount"]),
-                "currency": item["currency"].upper(),
-                "status": "validated"
-            }
-            self.processed_items.append(sanitized_item)
-
-        return {
-            "processed": len(self.processed_items),
-            "failed": len(self.failed_items)
-        }
+        clean_hashes = [h for h in final_hashes if h is not None]
+        return clean_hashes, failed_indices
