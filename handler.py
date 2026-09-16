@@ -1,37 +1,33 @@
-import logging
+import re
 
-def process_wallet_transaction(data: dict):
+def validate_address(address: str) -> bool:
+    """Validates Ethereum-like wallet address format."""
+    return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
+
+def validate_amount(amount: float) -> bool:
+    """Ensures transaction amount is positive and non-zero."""
+    return isinstance(amount, (int, float)) and amount > 0
+
+def process_transactions(queue):
     """
-    Main processing loop for wallet transactions with input validation.
+    Main processing loop with input validation
+    for wallet-utility-83 pipeline.
     """
-    required_fields = ['address', 'amount', 'currency']
+    processed = []
+    for tx in queue:
+        addr = tx.get('address')
+        amt = tx.get('amount')
+
+        if not validate_address(addr):
+            print(f'Skipping: Invalid address format {addr}')
+            continue
+
+        if not validate_amount(amt):
+            print(f'Skipping: Invalid amount {amt}')
+            continue
+
+        # Execute transaction logic here
+        processed.append({'address': addr, 'amount': amt, 'status': 'success'})
+        print(f'Processed tx for {addr}')
     
-    # Validate presence of fields
-    for field in required_fields:
-        if field not in data:
-            logging.error(f'missing field: {field}')
-            return False
-
-    # Validate address format (basic alphanumeric length check)
-    address = data.get('address', '')
-    if not (26 <= len(address) <= 42):
-        logging.error('invalid address length')
-        return False
-
-    # Validate amount range
-    try:
-        amount = float(data.get('amount', 0))
-        if amount <= 0:
-            logging.error('negative or zero amount')
-            return False
-    except ValueError:
-        logging.error('non-numeric amount provided')
-        return False
-
-    # Proceed with transaction logic
-    logging.info(f'processing {amount} {data["currency"]} to {address}')
-    return True
-
-if __name__ == '__main__':
-    sample_payload = {'address': '0x123abc...', 'amount': 1.5, 'currency': 'BTC'}
-    process_wallet_transaction(sample_payload)
+    return processed
