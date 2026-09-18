@@ -1,32 +1,28 @@
 import re
 from typing import Optional
 
-def validate_address(address: str, chain_type: str = 'evm') -> bool:
-    """Validates crypto wallet addresses based on chain constraints."""
-    if not isinstance(address, str) or not address:
+# crypto address validation patterns
+ADDRESS_PATTERNS = {
+    'btc': r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$',
+    'eth': r'^0x[a-fA-F0-9]{40}$',
+    'sol': r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+}
+
+def validate_address(address: str, chain_type: str) -> bool:
+    """verify crypto address against chain-specific regex"""
+    pattern = ADDRESS_PATTERNS.get(chain_type.lower())
+    if not pattern:
         return False
+    return bool(re.match(pattern, address))
 
-    if chain_type == 'evm':
-        return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
-    elif chain_type == 'btc':
-        # Simple regex for Legacy/Segwit formats
-        return bool(re.match(r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$', address))
-    
-    return False
-
-def validate_amount(amount: str) -> Optional[float]:
-    """Converts string amount to float with edge case checks."""
+def sanitize_amount(amount: str) -> Optional[float]:
+    """clean string input and convert to float"""
     try:
-        val = float(amount)
-        if val < 0:
-            return None
-        return val
+        cleaned = re.sub(r'[^0-9.]', '', amount)
+        return float(cleaned)
     except (ValueError, TypeError):
         return None
 
-def sanitize_input(data: str, max_length: int = 128) -> str:
-    """Sanitizes input strings to prevent overflow or injection."""
-    if not data:
-        return ""
-    cleaned = re.sub(r'[^a-zA-Z0-9_]', '', data)
-    return cleaned[:max_length]
+def validate_tx_hash(tx_hash: str) -> bool:
+    """validate generic 64-character hex transaction hash"""
+    return bool(re.match(r'^0x[a-fA-F0-9]{64}$', tx_hash))
