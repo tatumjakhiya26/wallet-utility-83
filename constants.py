@@ -1,23 +1,38 @@
-from enum import Enum
+import enum
 
-class WalletErrorCodes(Enum):
-    INSUFFICIENT_FUNDS = "ERR_001"
-    INVALID_ADDRESS = "ERR_002"
-    NETWORK_TIMEOUT = "ERR_003"
-    DECRYPTION_FAILED = "ERR_004"
-    UNSUPPORTED_ASSET = "ERR_005"
+# Network identifiers for blockchain interaction
+class NetworkType(enum.Enum):
+    MAINNET = "mainnet"
+    TESTNET = "testnet"
+    DEVNET = "devnet"
 
-ERROR_MESSAGES = {
-    WalletErrorCodes.INSUFFICIENT_FUNDS: "Insufficient balance for transaction requirements",
-    WalletErrorCodes.INVALID_ADDRESS: "The provided wallet address format is invalid",
-    WalletErrorCodes.NETWORK_TIMEOUT: "Connection to blockchain node timed out",
-    WalletErrorCodes.DECRYPTION_FAILED: "Failed to unlock wallet with provided credentials",
-    WalletErrorCodes.UNSUPPORTED_ASSET: "Transaction currency not supported by current chain"
+# Default gas limit configurations
+GAS_LIMIT_TRANSFER = 21000
+GAS_LIMIT_CONTRACT = 100000
+
+# Decimal precision for common crypto assets
+DECIMALS_ETH = 18
+DECIMALS_BTC = 8
+
+# Request timeout settings in seconds
+DEFAULT_TIMEOUT = 30
+MAX_RETRIES = 3
+
+# Wallet storage encryption parameters
+KDF_ITERATIONS = 600000
+SALT_SIZE = 16
+
+# Standardized path for key storage
+KEYSTORE_PATH = "~/.wallet-utility-83/keystore"
+
+# Supported asset symbols
+SUPPORTED_ASSETS = {
+    "ETH": "ethereum",
+    "BTC": "bitcoin",
+    "SOL": "solana"
 }
 
-MAX_RETRIES = 3
-DEFAULT_TIMEOUT_SECONDS = 30.0
-
-def get_error_message(code: WalletErrorCodes) -> str:
-    """Return user-friendly error message for a specific code."""
-    return ERROR_MESSAGES.get(code, "An unknown wallet error occurred")
+def get_decimals(symbol: str) -> int:
+    """Return precision for a given asset symbol."""
+    mapping = {"ETH": DECIMALS_ETH, "BTC": DECIMALS_BTC}
+    return mapping.get(symbol.upper(), 18)
