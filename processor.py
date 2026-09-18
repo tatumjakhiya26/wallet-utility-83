@@ -1,33 +1,32 @@
 import logging
-from typing import List, Dict, Any
 
-logger = logging.getLogger(__name__)
+class TransactionError(Exception):
+    """Base exception for transaction processing issues."""
+    pass
 
-class TransactionProcessor:
-    """Handles cryptographic wallet transaction batch processing."""
+def process_transaction(tx_data: dict) -> bool:
+    """Validates and processes cryptocurrency transaction data."""
+    required_fields = ['amount', 'sender', 'receiver']
     
-    def __init__(self, fee_threshold: float = 0.001):
-        self.fee_threshold = fee_threshold
-
-    def validate_batch(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filter transactions based on fee requirements."""
-        return [tx for tx in transactions if tx.get('fee', 0) >= self.fee_threshold]
-
-    def process_transactions(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Executes processed batch and returns result status."""
-        valid_txs = self.validate_batch(batch)
-        processed_count = 0
+    try:
+        # Check for missing data
+        if not all(k in tx_data for k in required_fields):
+            raise TransactionError(f"Missing fields: {required_fields}")
         
-        for tx in valid_txs:
-            try:
-                # Mock execution logic for wallet operations
-                logger.info(f"Processing transaction: {tx.get('id')}")
-                processed_count += 1
-            except Exception as e:
-                logger.error(f"Failed to process {tx.get('id')}: {str(e)}")
-                
-        return {
-            "status": "success",
-            "processed": processed_count,
-            "total": len(batch)
-        }
+        # Check for non-positive amounts
+        if tx_data['amount'] <= 0:
+            raise ValueError("Transaction amount must be positive")
+            
+        # Simulation of chain interaction
+        logging.info(f"Processing {tx_data['amount']} from {tx_data['sender']}")
+        return True
+        
+    except ValueError as ve:
+        logging.error(f"Data validation failure: {ve}")
+        return False
+    except KeyError as ke:
+        logging.error(f"Schema inconsistency: {ke}")
+        return False
+    except Exception as e:
+        logging.critical(f"Unexpected system failure: {e}")
+        raise TransactionError("Internal processing error") from e
