@@ -4,27 +4,28 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def retry_network_op(max_attempts=3, delay=2):
-    """Decorator to retry network operations on failure."""
+def retry_network_op(max_retries=3, delay=2):
+    """Decorator for retrying unstable network operations."""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(max_attempts):
+            attempts = 0
+            while attempts < max_retries:
                 try:
                     return func(*args, **kwargs)
                 except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}")
-                    if attempt < max_attempts - 1:
-                        time.sleep(delay * (2 ** attempt))
-            logger.error("Max retries reached. Operation failed.")
-            raise last_exception
+                    attempts += 1
+                    logger.warning(f"Attempt {attempts} failed: {e}. Retrying...")
+                    if attempts == max_retries:
+                        raise
+                    time.sleep(delay)
+            return None
         return wrapper
     return decorator
 
-@retry_network_op(max_attempts=3)
-def fetch_balance(address: str):
-    """Example function for querying blockchain state."""
-    # Simulation of network interaction logic
-    pass
+@retry_network_op(max_retries=3, delay=1)
+def fetch_balance(address):
+    """Simulate fetching crypto balance with retry logic."""
+    # Example implementation placeholder
+    print(f"Fetching data for {address}")
+    return 0.0
