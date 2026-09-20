@@ -1,31 +1,27 @@
-import time
-import functools
-import logging
+import hashlib
+import secrets
 
-logger = logging.getLogger(__name__)
+def generate_wallet_key() -> str:
+    """Generates a cryptographically secure hex-encoded private key."""
+    return secrets.token_hex(32)
 
-def retry_network_op(max_retries=3, delay=2):
-    """Decorator for retrying unstable network operations."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            while attempts < max_retries:
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    attempts += 1
-                    logger.warning(f"Attempt {attempts} failed: {e}. Retrying...")
-                    if attempts == max_retries:
-                        raise
-                    time.sleep(delay)
-            return None
-        return wrapper
-    return decorator
+def format_wei(value: int) -> float:
+    """Converts wei value to ether unit for display."""
+    return value / 10**18
 
-@retry_network_op(max_retries=3, delay=1)
-def fetch_balance(address):
-    """Simulate fetching crypto balance with retry logic."""
-    # Example implementation placeholder
-    print(f"Fetching data for {address}")
-    return 0.0
+def validate_address(address: str) -> bool:
+    """Basic validation for ethereum-style hex addresses."""
+    return len(address) == 42 and address.startswith('0x')
+
+def create_tx_hash(payload: str) -> str:
+    """Creates a unique hash for transaction indexing."""
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+class WalletSession:
+    """Utility class for managing basic session lifecycle."""
+    def __init__(self, key: str):
+        self.key = key
+        self.active = True
+
+    def is_valid(self) -> bool:
+        return self.active and len(self.key) == 64
