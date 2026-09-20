@@ -1,29 +1,52 @@
 import re
+from typing import Union
 
+def wei_to_ether(wei_value: int) -> float:
+    """Convert a value in Wei to its Ether equivalent.
 
-def btc_to_satoshi(btc_amount: float) -> int:
-    """Convert Bitcoin amount to Satoshi unit."""
-    if btc_amount < 0:
-        raise ValueError("Amount cannot be negative")
-    return int(round(btc_amount * 100_000_000))
+    Args:
+        wei_value: The amount in Wei to convert.
 
+    Returns:
+        The equivalent value in Ether as a float.
+    """
+    return wei_value / 10**18
 
-def satoshi_to_btc(satoshi_amount: int) -> float:
-    """Convert Satoshi unit to Bitcoin amount."""
-    if satoshi_amount < 0:
-        raise ValueError("Amount cannot be negative")
-    return float(satoshi_amount) / 100_000_000
+def ether_to_wei(ether_value: Union[int, float]) -> int:
+    """Convert a value in Ether to its Wei equivalent.
 
+    Args:
+        ether_value: The amount in Ether to convert.
+
+    Returns:
+        The equivalent value in Wei as an integer.
+    """
+    return int(ether_value * 10**18)
 
 def is_valid_eth_address(address: str) -> bool:
-    """Verify if the string matches basic Ethereum address structure."""
+    """Verify if the provided string matches the Ethereum address format.
+
+    Args:
+        address: The hexadecimal string to validate.
+
+    Returns:
+        True if the address is valid, False otherwise.
+    """
     if not isinstance(address, str):
         return False
     return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
 
-
 def truncate_address(address: str, start_chars: int = 6, end_chars: int = 4) -> str:
-    """Truncate a crypto address for safe UI visualization."""
-    if not address or len(address) <= (start_chars + end_chars):
+    """Truncate a crypto address for display purposes.
+
+    Args:
+        address: The full wallet address.
+        start_chars: Number of characters to keep at the beginning.
+        end_chars: Number of characters to keep at the end.
+
+    Returns:
+        The truncated address with ellipses (e.g., '0x1234...abcd').
+    """
+    if len(address) <= (start_chars + end_chars + 3):
         return address
     return f"{address[:start_chars]}...{address[-end_chars:]}"
