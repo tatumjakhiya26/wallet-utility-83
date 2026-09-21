@@ -1,52 +1,27 @@
-import re
+import decimal
 from typing import Union
 
-def wei_to_ether(wei_value: int) -> float:
-    """Convert a value in Wei to its Ether equivalent.
+# crypto-specific precision handling
+SATOSHIS_PER_BTC = decimal.Decimal('100000000')
 
-    Args:
-        wei_value: The amount in Wei to convert.
+def format_crypto_amount(amount: Union[int, float, str], decimals: int = 8) -> str:
+    """Convert raw integer satoshi units to formatted decimal string."""
+    val = decimal.Decimal(str(amount))
+    return f"{val / SATOSHIS_PER_BTC:.{decimals}f}"
 
-    Returns:
-        The equivalent value in Ether as a float.
-    """
-    return wei_value / 10**18
-
-def ether_to_wei(ether_value: Union[int, float]) -> int:
-    """Convert a value in Ether to its Wei equivalent.
-
-    Args:
-        ether_value: The amount in Ether to convert.
-
-    Returns:
-        The equivalent value in Wei as an integer.
-    """
-    return int(ether_value * 10**18)
-
-def is_valid_eth_address(address: str) -> bool:
-    """Verify if the provided string matches the Ethereum address format.
-
-    Args:
-        address: The hexadecimal string to validate.
-
-    Returns:
-        True if the address is valid, False otherwise.
-    """
-    if not isinstance(address, str):
+def validate_checksum(address: str) -> bool:
+    """Basic length and prefix validation for wallet addresses."""
+    if not address or len(address) < 26 or len(address) > 35:
         return False
-    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+    return address[0] in ('1', '3', 'b')
 
-def truncate_address(address: str, start_chars: int = 6, end_chars: int = 4) -> str:
-    """Truncate a crypto address for display purposes.
+def calculate_tx_fee(size_bytes: int, sat_per_byte: int) -> int:
+    """Calculate total transaction fee based on market rate."""
+    return size_bytes * sat_per_byte
 
-    Args:
-        address: The full wallet address.
-        start_chars: Number of characters to keep at the beginning.
-        end_chars: Number of characters to keep at the end.
-
-    Returns:
-        The truncated address with ellipses (e.g., '0x1234...abcd').
-    """
-    if len(address) <= (start_chars + end_chars + 3):
-        return address
-    return f"{address[:start_chars]}...{address[-end_chars:]}"
+def normalize_units(value: float, source_currency: str = 'BTC') -> decimal.Decimal:
+    """Ensure all amounts are handled as high-precision decimals."""
+    try:
+        return decimal.Decimal(str(value)).quantize(decimal.Decimal('0.00000001'))
+    except decimal.InvalidOperation:
+        return decimal.Decimal('0.00000000')
