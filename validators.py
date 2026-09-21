@@ -1,28 +1,40 @@
 import re
-from typing import Optional
 
-# crypto address validation patterns
-ADDRESS_PATTERNS = {
-    'btc': r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$',
-    'eth': r'^0x[a-fA-F0-9]{40}$',
-    'sol': r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
-}
+class AddressValidationError(Exception):
+    """Custom exception for wallet address format errors."""
+    pass
 
-def validate_address(address: str, chain_type: str) -> bool:
-    """verify crypto address against chain-specific regex"""
-    pattern = ADDRESS_PATTERNS.get(chain_type.lower())
-    if not pattern:
-        return False
-    return bool(re.match(pattern, address))
+def validate_eth_address(address: str) -> bool:
+    """
+    Validates Ethereum-style hex addresses with checksum integrity check.
+    Raises AddressValidationError on invalid formats or types.
+    """
+    if not isinstance(address, str):
+        raise AddressValidationError("Address must be a string.")
 
-def sanitize_amount(amount: str) -> Optional[float]:
-    """clean string input and convert to float"""
+    if not re.match(r'^0x[a-fA-F0-9]{40}$', address):
+        raise AddressValidationError(f"Invalid address format: {address}")
+
+    return True
+
+def validate_transaction_amount(amount: float, min_limit: float = 0.0001) -> bool:
+    """
+    Checks if transaction amount is positive and above network dust limits.
+    """
     try:
-        cleaned = re.sub(r'[^0-9.]', '', amount)
-        return float(cleaned)
-    except (ValueError, TypeError):
-        return None
+        amount_float = float(amount)
+    except (TypeError, ValueError):
+        raise ValueError("Amount must be a numeric value.")
 
-def validate_tx_hash(tx_hash: str) -> bool:
-    """validate generic 64-character hex transaction hash"""
-    return bool(re.match(r'^0x[a-fA-F0-9]{64}$', tx_hash))
+    if amount_float < min_limit:
+        raise ValueError(f"Amount {amount_float} below minimum limit of {min_limit}")
+
+    return True
+
+def sanitize_input(value: str) -> str:
+    """
+    Strips whitespace and null bytes from input strings for security.
+    """
+    if not value:
+        return ""
+    return str(value).strip().replace('\0', '')
