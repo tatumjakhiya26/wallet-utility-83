@@ -1,34 +1,28 @@
-import logging
-import re
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
 
-# regex for crypto address validation
-ADDRESS_PATTERN = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
+def format_crypto_amount(amount: str, decimals: int = 8) -> str:
+    """Normalizes crypto amount strings to fixed decimal precision."""
+    try:
+        value = Decimal(amount)
+        quantizer = Decimal('1.' + '0' * decimals)
+        return str(value.quantize(quantizer, rounding=ROUND_HALF_UP))
+    except (ValueError, ArithmeticError):
+        return "0.00000000"
 
-def validate_input(data: dict) -> bool:
-    """Ensures wallet operations receive valid inputs."""
-    if 'address' not in data or not ADDRESS_PATTERN.match(data['address']):
-        logging.error("Invalid wallet address format")
-        return False
-    if not isinstance(data.get('amount'), (int, float)) or data['amount'] <= 0:
-        logging.error("Invalid transaction amount")
-        return False
-    return True
+def validate_address_format(address: str, chain: str) -> bool:
+    """Checks basic address patterns for supported chains."""
+    patterns = {
+        "eth": lambda a: len(a) == 42 and a.startswith("0x"),
+        "btc": lambda a: len(a) in range(26, 36) and a[0] in ("1", "3", "b")
+    }
+    validator = patterns.get(chain.lower())
+    return validator(address) if validator else False
 
-def process_transactions(queue: list):
-    """Main processing loop for wallet operations."""
-    for entry in queue:
-        try:
-            if not validate_input(entry):
-                continue
-            
-            # proceed with wallet logic
-            logging.info(f"Processing transaction for {entry['address']}")
-        except KeyError as e:
-            logging.error(f"Malformed transaction object: {e}")
-        except Exception as e:
-            logging.critical(f"Unexpected error during processing: {e}")
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    sample_queue = [{'address': '0x1234567890abcdef1234567890abcdef12345678', 'amount': 1.5}]
-    process_transactions(sample_queue)
+def calculate_transaction_fee(amount: str, fee_rate: float) -> str:
+    """Calculates fee based on amount and rate percentage."""
+    try:
+        fee = Decimal(amount) * Decimal(str(fee_rate))
+        return format_crypto_amount(str(fee))
+    except (ValueError, TypeError):
+        return "0.00000000"
