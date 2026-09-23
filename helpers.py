@@ -1,27 +1,63 @@
-import decimal
+"""Helper utilities for cryptocurrency formatting, conversion, and validation."""
+
+from decimal import Decimal, ROUND_DOWN
+import re
 from typing import Union
 
-# crypto-specific precision handling
-SATOSHIS_PER_BTC = decimal.Decimal('100000000')
 
-def format_crypto_amount(amount: Union[int, float, str], decimals: int = 8) -> str:
-    """Convert raw integer satoshi units to formatted decimal string."""
-    val = decimal.Decimal(str(amount))
-    return f"{val / SATOSHIS_PER_BTC:.{decimals}f}"
+def satoshi_to_btc(satoshis: int) -> Decimal:
+    """Convert an amount in satoshis to Bitcoin (BTC).
 
-def validate_checksum(address: str) -> bool:
-    """Basic length and prefix validation for wallet addresses."""
-    if not address or len(address) < 26 or len(address) > 35:
-        return False
-    return address[0] in ('1', '3', 'b')
+    Args:
+        satoshis: Integer value representing satoshis.
 
-def calculate_tx_fee(size_bytes: int, sat_per_byte: int) -> int:
-    """Calculate total transaction fee based on market rate."""
-    return size_bytes * sat_per_byte
+    Returns:
+        Decimal representation of the amount in BTC.
+    """
+    if satoshis < 0:
+        raise ValueError("Satoshi amount cannot be negative.")
+    return (Decimal(satoshis) / Decimal(10**8)).quantize(Decimal("0.00000001"), rounding=ROUND_DOWN)
 
-def normalize_units(value: float, source_currency: str = 'BTC') -> decimal.Decimal:
-    """Ensure all amounts are handled as high-precision decimals."""
-    try:
-        return decimal.Decimal(str(value)).quantize(decimal.Decimal('0.00000001'))
-    except decimal.InvalidOperation:
-        return decimal.Decimal('0.00000000')
+
+def btc_to_satoshi(btc_amount: Union[Decimal, float, str]) -> int:
+    """Convert a Bitcoin (BTC) amount to satoshis.
+
+    Args:
+        btc_amount: Amount in BTC as Decimal, float, or string.
+
+    Returns:
+        Integer equivalent in satoshis.
+    """
+    decimal_amount = Decimal(str(btc_amount))
+    if decimal_amount < 0:
+        raise ValueError("BTC amount cannot be negative.")
+    return int(decimal_amount * Decimal(10**8))
+
+
+def mask_wallet_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
+    """Mask a wallet address for safe display in UI logs or screens.
+
+    Args:
+        address: Public wallet address string.
+        prefix_len: Number of initial characters to keep visible.
+        suffix_len: Number of trailing characters to keep visible.
+
+    Returns:
+        Truncated address with ellipsis in between.
+    """
+    if len(address) <= prefix_len + suffix_len:
+        return address
+    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
+
+
+def is_hex_address(address: str) -> bool:
+    """Check if a string matches basic EVM hexadecimal address structure.
+
+    Args:
+        address: Address string to validate.
+
+    Returns:
+        True if string is a valid 0x-prefixed 40-character hex address.
+    """
+    pattern = r"^0x[a-fA-F0-9]{40}$"
+    return bool(re.match(pattern, address))
