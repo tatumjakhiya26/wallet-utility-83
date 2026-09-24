@@ -1,57 +1,37 @@
 import logging
-import re
+import sys
 from typing import Optional
 
-
-class CryptoMaskingFormatter(logging.Formatter):
-    """Custom log formatter that scrubs private keys and secrets from output."""
-
-    # Regex matching 64-character hex strings (common raw private key format)
-    PRIVATE_KEY_REGEX = re.compile(r"\b(0x)?[a-fA-F0-9]{64}\b")
-
-    def __init__(self, fmt: Optional[str] = None, datefmt: Optional[str] = None) -> None:
-        super().__init__(fmt=fmt, datefmt=datefmt)
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Formats log record while masking sensitive crypto key patterns.
-
-        Args:
-            record: The logging record instance.
-
-        Returns:
-            Formatted string with masked private keys.
-        """
-        original_msg = super().format(record)
-        return self.PRIVATE_KEY_REGEX.sub("[MASKED_KEY]", original_msg)
-
-
-def setup_logger(name: str = "wallet_utility", level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
-    """Configures a secure logger with masking for wallet operations.
-
-    Args:
-        name: Identifier for the logger instance.
-        level: Logging verbosity level.
-        log_file: Optional destination path for log output.
-
-    Returns:
-        Configured Logger object.
+def setup_crypto_logger(name: str = "wallet-utility-83") -> logging.Logger:
+    """
+    Configures a standardized logger for crypto operations.
     """
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
 
-    if logger.handlers:
-        return logger
-
-    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    formatter = CryptoMaskingFormatter(fmt=fmt)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
     return logger
+
+def log_transaction_status(logger: logging.Logger, tx_id: str, status: str, details: Optional[str] = None) -> None:
+    """
+    Logs structured transaction lifecycle updates.
+    """
+    message = f"TX[{tx_id}] - status: {status}"
+    if details:
+        message += f" | details: {details}"
+    
+    if status.lower() in ["failed", "error", "rejected"]:
+        logger.error(message)
+    else:
+        logger.info(message)
+
+# Instantiate default utility logger
+crypto_logger = setup_crypto_logger()
