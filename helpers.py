@@ -1,24 +1,33 @@
-import time
-import functools
 import logging
-from typing import Callable, Any
+from typing import Optional
 
-logger = logging.getLogger(__name__)
+def validate_address(address: str) -> bool:
+    """verify crypto wallet address format"""
+    if not address or len(address) < 26 or len(address) > 35:
+        return False
+    return address.isalnum()
 
-def retry_network_operation(max_attempts: int = 3, delay: float = 2.0):
-    """Decorator for retrying unstable network calls."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
-                    time.sleep(delay)
-            logger.error(f"Operation failed after {max_attempts} attempts.")
-            raise last_exception
-        return wrapper
-    return decorator
+def format_balance(amount: float, decimals: int = 8) -> str:
+    """format float balance to precise string"""
+    return f"{amount:.{decimals}f}"
+
+def mask_key(key: str) -> str:
+    """obfuscate private key for logs"""
+    if len(key) < 8:
+        return "********"
+    return f"{key[:4]}...{key[-4:]}"
+
+class WalletError(Exception):
+    """base exception for wallet operations"""
+    pass
+
+def get_logger(name: str) -> logging.Logger:
+    """standardized logger configuration"""
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+    return logger
