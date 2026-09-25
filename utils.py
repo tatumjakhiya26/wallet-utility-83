@@ -1,29 +1,35 @@
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+import time
+import logging
+import functools
+from typing import Callable, Any
 
-def format_crypto_amount(amount: float, decimals: int = 8) -> str:
-    """Formats a crypto amount to a specific decimal precision."""
-    if amount < 0:
-        raise ValueError("Amount cannot be negative")
-    
-    quantize_str = "1." + ("0" * decimals)
-    result = Decimal(str(amount)).quantize(Decimal(quantize_str), rounding=ROUND_HALF_UP)
-    return str(result)
+logger = logging.getLogger(__name__)
 
-def calculate_fee(amount: float, fee_rate: float) -> Decimal:
-    """Calculates network transaction fee based on rate."""
-    return Decimal(str(amount)) * Decimal(str(fee_rate))
+def retry_network_op(retries: int = 3, delay: float = 2.0, backoff: float = 1.5):
+    """Decorator for retrying unstable network operations."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == retries - 1:
+                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
+                        raise
+                    
+                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s: {e}")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None
+        return wrapper
+    return decorator
 
-def validate_address(address: str, prefix: str = '0x') -> bool:
-    """Basic validation for crypto wallet addresses."""
-    if not address.startswith(prefix):
-        return False
-    return len(address) > 26 and len(address) < 45
-
-def convert_sats_to_btc(sats: int) -> float:
-    """Converts satoshis to whole BTC."""
-    return float(sats) / 100_000_000
-
-def sanitize_input(data: str) -> str:
-    """Removes whitespace and ensures lowercase for hashing."""
-    return data.strip().lower()
+@retry_network_op(retries=3, delay=1.0)
+def fetch_wallet_balance(address: str):
+    """Example usage for network-dependent wallet fetch."""
+    # Simulating actual network call
+    logger.info(f"Fetching balance for {address}")
+    # raise ConnectionError("Service unavailable") 
+    return 0.0
