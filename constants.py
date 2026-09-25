@@ -1,30 +1,30 @@
-from typing import Dict
+import enum
 
-# Crypto currency network identifiers
-MAINNET = 'mainnet'
-TESTNET = 'testnet'
+# Network identifiers for blockchain interaction
+class NetworkType(enum.Enum):
+    MAINNET = "mainnet"
+    TESTNET = "testnet"
+    DEVNET = "devnet"
 
-# Standardized decimal precision for calculations
-DEFAULT_PRECISION = 8
+# Standardized unit definitions
+SATOSHI_PER_BTC = 10**8
+GWEI_PER_ETH = 10**9
 
-# Gas limit thresholds for common transaction types
-GAS_LIMIT_TRANSFER = 21000
-GAS_LIMIT_CONTRACT = 100000
+# Default timeout values for network requests in seconds
+DEFAULT_REQUEST_TIMEOUT = 30
+MAX_RETRIES = 3
 
-# Dictionary of network configuration defaults
-NETWORK_CONFIGS: Dict[str, dict] = {
-    MAINNET: {
-        'chain_id': 1,
-        'explorer': 'https://etherscan.io',
-        'timeout': 30
-    },
-    TESTNET: {
-        'chain_id': 11155111,
-        'explorer': 'https://sepolia.etherscan.io',
-        'timeout': 60
-    }
-}
+# Common derivation paths
+BIP44_PATH = "m/44'/0'/0'/0/0"
 
-# Security constants
+# Validation constraints
 MIN_PASSWORD_LENGTH = 12
-MAX_RETRY_ATTEMPTS = 3
+SUPPORTED_CURRENCIES = {"BTC", "ETH", "USDT", "USDC"}
+
+# Default gas settings
+DEFAULT_GAS_LIMIT = 21000
+PRIORITY_FEE_MULTIPLIER = 1.2
+
+# Configuration paths
+CONFIG_FILE_NAME = "wallet.conf"
+STORAGE_DIRECTORY = ".wallet_data"
