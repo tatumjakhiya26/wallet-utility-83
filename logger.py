@@ -1,52 +1,40 @@
 import logging
-import re
 import sys
 from typing import Optional
 
-# Pattern to detect private keys or sensitive seed phrases in log output
-PRIVATE_KEY_PATTERN = re.compile(r"(?i)(private_?key|secret|seed_?phrase)[\s=:]+['"]?([a-zA-Z0-9]{32,64})['"]?")
-
-class WalletAuditFormatter(logging.Formatter):
-    """Custom formatter that redacts sensitive crypto data from log messages."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        original_msg = super().format(record)
-        # Redact private key patterns in logged output
-        cleaned_msg = PRIVATE_KEY_PATTERN.sub(r"\1: [REDACTED]", original_msg)
-        return cleaned_msg
-
-
-def setup_logger(
-    name: str = "wallet_utility",
-    log_level: int = logging.INFO,
-    log_file: Optional[str] = None
-) -> logging.Logger:
-    """Configures and returns a centralized logger instance for wallet operations."""
+def setup_wallet_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """
+    Configures a standardized logger for wallet-utility-83 components.
+    
+    Args:
+        name: The name of the logger instance.
+        level: Logging level, defaults to INFO.
+        
+    Returns:
+        Configured logging.Logger instance.
+    """
     logger = logging.getLogger(name)
-    logger.setLevel(log_level)
+    logger.setLevel(level)
 
-    # Prevent duplicate handlers if re-initialized
-    if logger.handlers:
-        return logger
-
-    formatter = WalletAuditFormatter(
-        "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # File handler if path is provided
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
+    
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
+        
     return logger
 
+def log_transaction_event(logger: logging.Logger, tx_hash: str, status: str) -> None:
+    """
+    Logs specific transaction lifecycle events for wallet operations.
 
-# Default logger instance for direct import
-wallet_logger = setup_logger()
+    Args:
+        logger: The logger instance to use.
+        tx_hash: The cryptographic transaction hash.
+        status: The current status of the transaction.
+    """
+    message: str = f"Transaction {tx_hash} updated to status: {status}"
+    logger.info(message)
