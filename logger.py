@@ -1,40 +1,33 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-def setup_wallet_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """
-    Configures a standardized logger for wallet-utility-83 components.
-    
-    Args:
-        name: The name of the logger instance.
-        level: Logging level, defaults to INFO.
-        
-    Returns:
-        Configured logging.Logger instance.
-    """
+def setup_logger(name: str = 'wallet-utility-83', log_file: str = 'app.log', level: int = logging.INFO):
+    """Configures a rotating file logger for crypto operations."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    handler.setFormatter(formatter)
+    # Prevent duplicate handlers if function is called multiple times
     if not logger.handlers:
+        # 5MB log rotation with 3 backup files
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=3
+        )
+        
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
         
+        # Optional: log to console as well
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
+
     return logger
 
-def log_transaction_event(logger: logging.Logger, tx_hash: str, status: str) -> None:
-    """
-    Logs specific transaction lifecycle events for wallet operations.
-
-    Args:
-        logger: The logger instance to use.
-        tx_hash: The cryptographic transaction hash.
-        status: The current status of the transaction.
-    """
-    message: str = f"Transaction {tx_hash} updated to status: {status}"
-    logger.info(message)
+# Initialize default logger instance
+logger = setup_logger()
