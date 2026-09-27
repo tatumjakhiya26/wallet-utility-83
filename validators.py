@@ -1,38 +1,32 @@
 import re
-from typing import Optional
 
-def is_valid_address(address: str, chain_type: str = "evm") -> bool:
-    """
-    Validate crypto wallet address format based on chain type.
+class ValidationError(Exception):
+    """Base class for validation errors in wallet-utility-83."""
+    pass
 
-    :param address: The wallet address string to check
-    :param chain_type: Network type, defaults to 'evm'
-    :return: Boolean indicating validity
-    """
-    if chain_type == "evm":
-        return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
-    if chain_type == "bitcoin":
-        return bool(re.match(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$", address))
-    return False
+def validate_address(address: str) -> bool:
+    """Validates cryptocurrency address format (hex string)."""
+    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
+        raise ValidationError(f"Invalid address length: {address}")
+    
+    if not re.match(r"^0x[a-fA-F0-9]+$", address):
+        raise ValidationError(f"Address must be hex string starting with 0x: {address}")
+    
+    return True
 
-def validate_amount(amount: str) -> Optional[float]:
-    """
-    Convert string amount to float if positive.
+def validate_amount(amount: float) -> bool:
+    """Ensures transaction amount is positive and non-zero."""
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        raise ValidationError(f"Amount must be a positive number: {amount}")
+    
+    return True
 
-    :param amount: Numeric string input
-    :return: Float value or None if invalid
-    """
+def process_input(address: str, amount: float):
+    """Validates inputs before entering the main processing loop."""
     try:
-        val = float(amount)
-        return val if val > 0 else None
-    except ValueError:
-        return None
-
-def sanitize_memo(memo: str) -> str:
-    """
-    Remove non-alphanumeric characters from memo fields.
-
-    :param memo: Input transaction memo
-    :return: Cleaned alphanumeric string
-    """
-    return re.sub(r"[^a-zA-Z0-9 ]", "", memo).strip()
+        validate_address(address)
+        validate_amount(amount)
+    except ValidationError as e:
+        # Log or re-raise based on integration requirements
+        print(f"Validation failed: {e}")
+        raise
