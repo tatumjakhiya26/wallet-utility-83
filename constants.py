@@ -1,44 +1,28 @@
-"""Constants for the wallet-utility-83 library.
+import os
 
-This module contains configuration defaults, supported networks, BIP44 derivation paths,
-and system-wide constants for crypto wallet utilities.
-"""
+# Crypto network configuration
+MAINNET_RPC = "https://mainnet.infura.io/v3/"
+TESTNET_RPC = "https://sepolia.infura.io/v3/"
 
-from typing import Dict, Final, Set
+# Wallet constraints and defaults
+DEFAULT_GAS_LIMIT = 21000
+MIN_CONFIRMATIONS = 3
+MAX_RETRIES = 5
 
-# Supported blockchain networks in the utility library
-SUPPORTED_NETWORKS: Final[Set[str]] = {"bitcoin", "ethereum", "solana", "polygon"}
+# Environment keys
+WALLET_PRIVATE_KEY_ENV = "WALLET_PRIVATE_KEY"
+API_KEY_ENV = "RPC_API_KEY"
 
-# Standard BIP-44 coin type derivation paths
-BIP44_PATHS: Final[Dict[str, str]] = {
-    "bitcoin": "m/44'/0'/0'/0/0",
-    "ethereum": "m/44'/60'/0'/0/0",
-    "solana": "m/44'/501'/0'/0'",
-    "polygon": "m/44'/966'/0'/0/0",
+# Supported tokens
+SUPPORTED_TOKENS = {
+    "ETH": "0x0000000000000000000000000000000000000000",
+    "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
 }
 
-# Number of decimals for the main native assets
-DECIMAL_PRECISION: Final[Dict[str, int]] = {
-    "BTC": 8,
-    "ETH": 18,
-    "SOL": 9,
-    "MATIC": 18,
-}
+# Validation patterns
+ADDRESS_PATTERN = r"^0x[a-fA-F0-9]{40}$"
 
-# Gas fee prioritization tiers and their rate multipliers
-GAS_MULTIPLIERS: Final[Dict[str, float]] = {
-    "low": 1.0,
-    "standard": 1.15,
-    "fast": 1.3,
-    "instant": 1.5,
-}
-
-# Default HTTP client connection timeout in seconds
-DEFAULT_TIMEOUT: Final[int] = 30
-
-# Public gateway RPC nodes for supported networks
-DEFAULT_RPC_ENDPOINTS: Final[Dict[str, str]] = {
-    "ethereum": "https://cloudflare-eth.com",
-    "polygon": "https://polygon-rpc.com",
-    "solana": "https://api.mainnet-beta.solana.com",
-}
+# Timeouts in seconds
+REQUEST_TIMEOUT = 30
+POLLING_INTERVAL = 15
