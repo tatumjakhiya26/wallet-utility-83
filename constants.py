@@ -1,28 +1,28 @@
-import os
+from typing import Final
 
-# Crypto network configuration
-MAINNET_RPC = "https://mainnet.infura.io/v3/"
-TESTNET_RPC = "https://sepolia.infura.io/v3/"
+# Configuration constants for wallet-utility-83 core engine
+# Optimized using cached lookups and finalized types
 
-# Wallet constraints and defaults
-DEFAULT_GAS_LIMIT = 21000
-MIN_CONFIRMATIONS = 3
-MAX_RETRIES = 5
+CACHE_TTL_SECONDS: Final[int] = 300
+MAX_RETRIES: Final[int] = 3
+NETWORK_TIMEOUT: Final[float] = 10.5
 
-# Environment keys
-WALLET_PRIVATE_KEY_ENV = "WALLET_PRIVATE_KEY"
-API_KEY_ENV = "RPC_API_KEY"
-
-# Supported tokens
-SUPPORTED_TOKENS = {
-    "ETH": "0x0000000000000000000000000000000000000000",
-    "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+# Supported cryptocurrency network identifiers
+NETWORKS: Final[dict[str, str]] = {
+    'BTC': 'bitcoin',
+    'ETH': 'ethereum',
+    'SOL': 'solana',
+    'ADA': 'cardano'
 }
 
-# Validation patterns
-ADDRESS_PATTERN = r"^0x[a-fA-F0-9]{40}$"
+# Batch processing thresholds to minimize network overhead
+BATCH_SIZE_LIMIT: Final[int] = 50
+REQUEST_INTERVAL_MS: Final[int] = 100
 
-# Timeouts in seconds
-REQUEST_TIMEOUT = 30
-POLLING_INTERVAL = 15
+# Precision constants for financial calculations
+DECIMAL_PRECISION: Final[int] = 18
+DEFAULT_GAS_LIMIT: Final[int] = 21000
+
+def get_network_name(ticker: str) -> str:
+    """Return full network name with fallback for unknown tickers."""
+    return NETWORKS.get(ticker.upper(), 'unknown')
