@@ -1,26 +1,35 @@
 import logging
-import sys
+import os
+from logging.handlers import RotatingFileHandler
 
-# configure logging for wallet-utility-83 crypto operations
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-
-def get_wallet_logger(name: str) -> logging.Logger:
-    """Factory to retrieve configured logger instance."""
+def setup_logger(name='wallet-utility-83', log_file='wallet.log', level=logging.INFO):
+    """Configures a rotating file logger for crypto wallet ops."""
     logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Prevent duplicate handlers if re-initialized
+    if logger.hasHandlers():
+        return logger
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # Max file size 5MB, keep 3 historical backups
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5*1024*1024, 
+        backupCount=3
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    # Output to console as well
+    console = logging.StreamHandler()
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+
     return logger
 
-def log_transaction_event(tx_hash: str, status: str, details: str = "") -> None:
-    """Log standardized crypto transaction lifecycle events."""
-    logger = get_wallet_logger("crypto_tx")
-    msg = f"TXID: {tx_hash} | STATUS: {status}"
-    if details:
-        msg += f" | INFO: {details}"
-    
-    if status.upper() in ["FAILED", "ERROR"]:
-        logger.error(msg)
-    else:
-        logger.info(msg)
+# Instance for global utility access
+logger = setup_logger()
