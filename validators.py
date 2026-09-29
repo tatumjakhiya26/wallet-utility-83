@@ -1,32 +1,29 @@
 import re
 
-class ValidationError(Exception):
-    """Base class for validation errors in wallet-utility-83."""
-    pass
+def validate_address(address: str, network: str = 'mainnet') -> bool:
+    """Validate crypto wallet address format."""
+    patterns = {
+        'bitcoin': r'^(1|3|bc1)[a-zA-Z0-9]{25,59}$',
+        'ethereum': r'^0x[a-fA-F0-9]{40}$'
+    }
+    pattern = patterns.get(network.lower())
+    if not pattern:
+        return False
+    return bool(re.match(pattern, address))
 
-def validate_address(address: str) -> bool:
-    """Validates cryptocurrency address format (hex string)."""
-    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
-        raise ValidationError(f"Invalid address length: {address}")
-    
-    if not re.match(r"^0x[a-fA-F0-9]+$", address):
-        raise ValidationError(f"Address must be hex string starting with 0x: {address}")
-    
-    return True
-
-def validate_amount(amount: float) -> bool:
-    """Ensures transaction amount is positive and non-zero."""
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        raise ValidationError(f"Amount must be a positive number: {amount}")
-    
-    return True
-
-def process_input(address: str, amount: float):
-    """Validates inputs before entering the main processing loop."""
+def validate_amount(amount: str) -> bool:
+    """Validate numeric format for transaction amounts."""
     try:
-        validate_address(address)
-        validate_amount(amount)
-    except ValidationError as e:
-        # Log or re-raise based on integration requirements
-        print(f"Validation failed: {e}")
-        raise
+        val = float(amount)
+        return val > 0
+    except (ValueError, TypeError):
+        return False
+
+def validate_payload(data: dict) -> bool:
+    """Check mandatory fields in processing payload."""
+    required = ['address', 'amount', 'currency']
+    return all(key in data for key in required)
+
+def sanitize_input(user_input: str) -> str:
+    """Remove whitespace and force lowercase for processing."""
+    return user_input.strip().lower()
