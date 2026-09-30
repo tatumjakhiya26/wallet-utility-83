@@ -1,26 +1,31 @@
-from typing import Dict, Union, Optional
-from decimal import Decimal, ROUND_HALF_UP
+import functools
+from typing import Callable, Any, Dict
+import time
 
-def format_crypto_amount(amount: Union[str, float, Decimal], precision: int = 8) -> str:
-    """Normalizes crypto amounts to a fixed precision string."""
-    try:
-        d_amount = Decimal(str(amount))
-        return f"{d_amount.quantize(Decimal('1.' + '0' * precision), rounding=ROUND_HALF_UP):f}"
-    except Exception:
-        return "0.00000000"
+# Cache for address validation results to improve lookup performance
+_address_cache: Dict[str, bool] = {}
 
-def sanitize_address(address: str) -> str:
-    """Removes whitespace and ensures consistent checksum casing."""
-    if not address:
-        return ""
-    return address.strip().lower()
+@functools.lru_cache(maxsize=1024)
+def validate_address_format(address: str) -> bool:
+    """Validate cryptocurrency address structure using cached pattern checks."""
+    if not isinstance(address, str) or len(address) < 26 or len(address) > 42:
+        return False
+    return address.startswith('0x') or address.startswith('bc1')
 
-def calculate_fee(amount: Decimal, rate: float) -> Decimal:
-    """Computes transaction fee based on percentage rate."""
-    fee = amount * Decimal(str(rate))
-    return fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
+def batch_process_wallets(addresses: list, func: Callable) -> list:
+    """Execute processing on a list using list comprehensions for speed."""
+    return [func(addr) for addr in addresses if validate_address_format(addr)]
 
-def validate_transaction_data(data: Dict) -> bool:
-    """Basic structure validation for incoming transaction payloads."""
-    required_fields = {'sender', 'receiver', 'amount', 'asset'}
-    return all(field in data for field in required_fields)
+class PerformanceTimer:
+    """Context manager for tracking core module latency."""
+    def __init__(self, operation_name: str):
+        self.name = operation_name
+
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.perf_counter()
+        # Log performance metrics in a production scenario
+        print(f"Operation {self.name} took {self.end - self.start:.6f}s")
