@@ -1,48 +1,37 @@
-import hashlib
-import time
-from typing import Dict, Any, List, Optional
+import logging
 
+def is_valid_address(address: str) -> bool:
+    """Validates basic crypto address format constraints."""
+    return isinstance(address, str) and 26 <= len(address) <= 35 and address.isalnum()
 
-class TransactionProcessor:
-    """Utility for processing and normalizing raw crypto transaction records."""
+def process_wallet_data(data_list: list):
+    """Main loop for processing incoming wallet data chunks."""
+    logger = logging.getLogger('wallet-utility-83')
+    
+    for entry in data_list:
+        address = entry.get('address')
+        amount = entry.get('amount')
 
-    DECIMALS = {
-        "BTC": 8,
-        "ETH": 18,
-        "SOL": 9,
-        "USDT": 6,
-    }
+        # Input validation checks
+        if not is_valid_address(address):
+            logger.error(f'Invalid wallet address detected: {address}')
+            continue
 
-    def __init__(self, default_symbol: str = "BTC"):
-        self.default_symbol = default_symbol.upper()
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            logger.error(f'Invalid transaction amount: {amount}')
+            continue
 
-    def to_base_unit(self, raw_amount: int, symbol: Optional[str] = None) -> float:
-        """Convert smallest unit (satoshi/wei) to base currency unit."""
-        sym = (symbol or self.default_symbol).upper()
-        decimals = self.DECIMALS.get(sym, 8)
-        return round(raw_amount / (10 ** decimals), decimals)
+        # Proceed with business logic
+        try:
+            print(f'Processing {amount} for {address}')
+            # Transaction processing logic here
+        except Exception as e:
+            logger.exception('Unexpected processing error')
 
-    def generate_tx_hash(self, tx_data: Dict[str, Any]) -> str:
-        """Generate deterministic internal hash for transaction deduplication."""
-        raw_str = f"{tx_data.get('sender')}:{tx_data.get('receiver')}:{tx_data.get('amount')}:{tx_data.get('timestamp')}"
-        return hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
-
-    def process_batch(self, raw_txs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process and sanitize a batch of raw wallet transactions."""
-        processed = []
-        for tx in raw_txs:
-            symbol = tx.get("symbol", self.default_symbol).upper()
-            raw_amt = int(tx.get("raw_amount", 0))
-            
-            normalized_tx = {
-                "tx_id": tx.get("tx_id") or self.generate_tx_hash(tx),
-                "sender": str(tx.get("sender", "")).lower(),
-                "receiver": str(tx.get("receiver", "")).lower(),
-                "symbol": symbol,
-                "amount": self.to_base_unit(raw_amt, symbol),
-                "raw_amount": raw_amt,
-                "timestamp": tx.get("timestamp", int(time.time())),
-                "status": "processed" if raw_amt > 0 else "failed"
-            }
-            processed.append(normalized_tx)
-        return processed
+if __name__ == '__main__':
+    sample_data = [
+        {'address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', 'amount': 0.05},
+        {'address': 'invalid_addr', 'amount': 0.1},
+        {'address': '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy', 'amount': -5}
+    ]
+    process_wallet_data(sample_data)
