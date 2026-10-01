@@ -1,33 +1,41 @@
-from typing import Dict, List, Optional
-from dataclasses import dataclass
+import logging
+from typing import Optional, Dict, Any
 
-@dataclass
-class WalletData:
-    address: str
-    balance: float
-    currency: str
+logger = logging.getLogger(__name__)
 
-def validate_address(address: str) -> bool:
-    """Verify basic crypto address structure."""
-    return len(address) >= 26 and len(address) <= 42
+class CryptoTransactionError(Exception):
+    """Custom exception for wallet operations."""
+    pass
 
-class WalletManager:
-    def __init__(self) -> None:
-        self.wallets: Dict[str, WalletData] = {}
+def validate_transaction(data: Dict[str, Any]) -> bool:
+    """Validates mandatory transaction fields."""
+    required_fields = {'amount', 'address', 'currency'}
+    if not all(field in data for field in required_fields):
+        raise CryptoTransactionError(f"Missing fields: {required_fields - data.keys()}")
+    if data['amount'] <= 0:
+        raise CryptoTransactionError("Transaction amount must be positive")
+    return True
 
-    def add_wallet(self, address: str, balance: float, currency: str = "BTC") -> None:
-        """Register a new wallet to the internal tracking system."""
-        if validate_address(address):
-            self.wallets[address] = WalletData(address, balance, currency)
+def process_wallet_transfer(tx_data: Dict[str, Any]) -> Optional[str]:
+    """
+    Executes a transfer with comprehensive edge case handling.
+    Returns transaction hash on success, None on failure.
+    """
+    try:
+        validate_transaction(tx_data)
+        
+        # Simulated blockchain interaction
+        logger.info(f"Processing transfer of {tx_data['amount']} to {tx_data['address']}")
+        return "tx_hash_0xdeadbeef"
+        
+    except CryptoTransactionError as e:
+        logger.error(f"Validation failed: {e}")
+        return None
+    except Exception as e:
+        logger.exception(f"Unexpected critical failure: {e}")
+        return None
 
-    def get_total_balance(self, currency: str) -> float:
-        """Calculate aggregate balance for a specific currency."""
-        total: float = 0.0
-        for wallet in self.wallets.values():
-            if wallet.currency == currency:
-                total += wallet.balance
-        return total
-
-    def list_addresses(self) -> List[str]:
-        """Return list of all tracked wallet addresses."""
-        return list(self.wallets.keys())
+if __name__ == "__main__":
+    sample = {'amount': 1.5, 'address': '0x123', 'currency': 'BTC'}
+    result = process_wallet_transfer(sample)
+    print(f"Result: {result}")
