@@ -1,29 +1,38 @@
 import re
 
-def validate_address(address: str, network: str = 'mainnet') -> bool:
-    """Validate crypto wallet address format."""
+class WalletValidationError(Exception):
+    """Custom exception for crypto wallet validation failures."""
+    pass
+
+def validate_address(address: str, chain: str) -> bool:
+    """
+    Validates wallet addresses based on blockchain patterns.
+    Raises WalletValidationError for malformed inputs.
+    """
+    if not address or not isinstance(address, str):
+        raise WalletValidationError("Address must be a non-empty string")
+
     patterns = {
-        'bitcoin': r'^(1|3|bc1)[a-zA-Z0-9]{25,59}$',
-        'ethereum': r'^0x[a-fA-F0-9]{40}$'
+        "ETH": r"^0x[a-fA-F0-9]{40}$",
+        "BTC": r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
     }
-    pattern = patterns.get(network.lower())
-    if not pattern:
-        return False
-    return bool(re.match(pattern, address))
 
-def validate_amount(amount: str) -> bool:
-    """Validate numeric format for transaction amounts."""
+    if chain not in patterns:
+        raise ValueError(f"Unsupported chain: {chain}")
+
+    if not re.match(patterns[chain], address):
+        raise WalletValidationError(f"Invalid {chain} address format")
+
+    return True
+
+def sanitize_amount(amount: str) -> float:
+    """
+    Parses and sanitizes numeric strings for financial operations.
+    """
     try:
-        val = float(amount)
-        return val > 0
+        value = float(amount)
+        if value < 0:
+            raise WalletValidationError("Amount cannot be negative")
+        return value
     except (ValueError, TypeError):
-        return False
-
-def validate_payload(data: dict) -> bool:
-    """Check mandatory fields in processing payload."""
-    required = ['address', 'amount', 'currency']
-    return all(key in data for key in required)
-
-def sanitize_input(user_input: str) -> str:
-    """Remove whitespace and force lowercase for processing."""
-    return user_input.strip().lower()
+        raise WalletValidationError("Invalid numeric format for amount")
