@@ -1,37 +1,35 @@
 import logging
+from typing import List, Dict, Any
 
-def is_valid_address(address: str) -> bool:
-    """Validates basic crypto address format constraints."""
-    return isinstance(address, str) and 26 <= len(address) <= 35 and address.isalnum()
+logger = logging.getLogger(__name__)
 
-def process_wallet_data(data_list: list):
-    """Main loop for processing incoming wallet data chunks."""
-    logger = logging.getLogger('wallet-utility-83')
-    
-    for entry in data_list:
-        address = entry.get('address')
-        amount = entry.get('amount')
+class TransactionProcessor:
+    """Handles crypto transaction validation and batch processing."""
 
-        # Input validation checks
-        if not is_valid_address(address):
-            logger.error(f'Invalid wallet address detected: {address}')
-            continue
+    def __init__(self, network: str = "mainnet"):
+        self.network = network
 
-        if not isinstance(amount, (int, float)) or amount <= 0:
-            logger.error(f'Invalid transaction amount: {amount}')
-            continue
+    def validate_tx(self, tx: Dict[str, Any]) -> bool:
+        """Basic integrity check for raw transaction data."""
+        required_fields = {"sender", "receiver", "amount", "nonce"}
+        return all(field in tx for field in required_fields)
 
-        # Proceed with business logic
-        try:
-            print(f'Processing {amount} for {address}')
-            # Transaction processing logic here
-        except Exception as e:
-            logger.exception('Unexpected processing error')
+    def process_batch(self, transactions: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Filters and counts successful transactions from a list."""
+        results = {"success": 0, "failed": 0}
+        
+        for tx in transactions:
+            try:
+                if self.validate_tx(tx):
+                    results["success"] += 1
+                else:
+                    results["failed"] += 1
+            except Exception as e:
+                logger.error(f"Unexpected processing error: {e}")
+                results["failed"] += 1
+        
+        return results
 
-if __name__ == '__main__':
-    sample_data = [
-        {'address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', 'amount': 0.05},
-        {'address': 'invalid_addr', 'amount': 0.1},
-        {'address': '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy', 'amount': -5}
-    ]
-    process_wallet_data(sample_data)
+    def format_status(self, results: Dict[str, int]) -> str:
+        """Provides a summary string for UI or logging output."""
+        return f"Processed {sum(results.values())} txs: {results['success']} OK, {results['failed']} ERR"
