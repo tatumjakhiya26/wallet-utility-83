@@ -1,35 +1,62 @@
 import logging
-import os
-from logging.handlers import RotatingFileHandler
+import re
+import sys
 
-def setup_logger(name='wallet-utility-83', log_file='wallet.log', level=logging.INFO):
-    """Configures a rotating file logger for crypto wallet ops."""
+
+class SensitiveDataFilter(logging.Filter):
+    """Filter that masks sensitive crypto keys and long hex strings in log records."""
+
+    # Matches potential private keys or long secret strings (64 hex chars)
+    SECRET_PATTERN = re.compile(r"\b(0x)?[a-fA-F0-9]{64}\b")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = self.SECRET_PATTERN.sub("[REDACTED_SECRET]", record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {
+                    k: (
+                        self.SECRET_PATTERN.sub("[REDACTED_SECRET]", str(v))
+                        if isinstance(v, str)
+                        else v
+                    )
+                    for k, v in record.args.items()
+                }
+            elif isinstance(record.args, tuple):
+                record.args = tuple(
+                    self.SECRET_PATTERN.sub("[REDACTED_SECRET]", str(arg))
+                    if isinstance(arg, str)
+                    else arg
+                    for arg in record.args
+                )
+        return True
+
+
+def setup_logger(
+    name: str = "wallet_utility", level: int = logging.INFO
+) -> logging.Logger:
+    """Configures and returns a logger instance with sensitive data masking."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if re-initialized
-    if logger.hasHandlers():
+    # Avoid adding duplicate handlers if already initialized
+    if logger.handlers:
         return logger
 
+    handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Max file size 5MB, keep 3 historical backups
-    handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=5*1024*1024, 
-        backupCount=3
-    )
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    handler.addFilter(SensitiveDataFilter())
 
-    # Output to console as well
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    logger.addHandler(console)
+    logger.addHandler(handler)
+    logger.propagate = False
 
     return logger
 
-# Instance for global utility access
-logger = setup_logger()
+
+# Default logger instance for quick access
+wallet_logger = setup_logger()
