@@ -1,45 +1,57 @@
-import hashlib
-import re
-import secrets
-
-ETH_ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
+from decimal import Decimal
+from typing import Optional, Union
 
 
-def wei_to_ether(wei: int) -> float:
-    """Convert Wei to Ether."""
-    if not isinstance(wei, int) or wei < 0:
-        raise ValueError('Wei value must be a non-negative integer.')
-    return wei / (10 ** 18)
+def format_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
+    """Truncates a cryptocurrency address for UI display.
+
+    Args:
+        address: The full wallet address string.
+        prefix_len: Number of characters to retain at the start.
+        suffix_len: Number of characters to retain at the end.
+
+    Returns:
+        A shortened address string formatted like '0x1234...abcd'.
+    """
+    if not address or len(address) <= (prefix_len + suffix_len):
+        return address
+    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
 
 
-def ether_to_wei(ether: float) -> int:
-    """Convert Ether to Wei."""
-    if not isinstance(ether, (int, float)) or ether < 0:
-        raise ValueError('Ether value must be a non-negative number.')
-    return int(ether * (10 ** 18))
+def convert_to_base_unit(
+    value: Union[int, float, str, Decimal], decimals: int = 18
+) -> Decimal:
+    """Converts a raw token amount to base unit (e.g., Wei to ETH).
+
+    Args:
+        value: Amount in smallest unit (e.g., Wei or Satoshi).
+        decimals: Number of decimal places for the token or coin.
+
+    Returns:
+        Decimal representation of the amount in base units.
+    """
+    decimal_val = Decimal(str(value))
+    factor = Decimal(10) ** decimals
+    return decimal_val / factor
 
 
-def is_valid_eth_address(address: str) -> bool:
-    """Check if the given string is a valid Ethereum address format."""
-    if not isinstance(address, str):
+def is_valid_hex_address(address: str, expected_length: Optional[int] = 42) -> bool:
+    """Validates whether a string is a valid hex-encoded crypto address.
+
+    Args:
+        address: The wallet address string to check.
+        expected_length: Expected total character length including '0x'.
+
+    Returns:
+        True if the address is a valid hex string, False otherwise.
+    """
+    if not address.startswith("0x"):
         return False
-    return bool(ETH_ADDRESS_PATTERN.match(address))
+    if expected_length is not None and len(address) != expected_length:
+        return False
 
-
-def generate_private_key() -> str:
-    """Generate a secure 256-bit private key represented as a hex string."""
-    return secrets.token_hex(32)
-
-
-def derive_mock_address(private_key_hex: str) -> str:
-    """Derive a mock wallet address from a private key using SHA-256."""
-    if len(private_key_hex) != 64:
-        raise ValueError('Invalid private key length.')
     try:
-        private_bytes = bytes.fromhex(private_key_hex)
+        int(address[2:], 16)
+        return True
     except ValueError:
-        raise ValueError('Private key must be a valid hex string.')
-    
-    hash_bytes = hashlib.sha256(private_bytes).digest()
-    address_bytes = hashlib.sha256(hash_bytes).digest()[-20:]
-    return '0x' + address_bytes.hex()
+        return False
