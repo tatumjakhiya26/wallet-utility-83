@@ -1,38 +1,26 @@
 import re
 
-class WalletValidationError(Exception):
-    """Custom exception for crypto wallet validation failures."""
-    pass
+# Crypto address validation patterns
+ADDRESS_PATTERNS = {
+    'bitcoin': r'^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$',
+    'ethereum': r'^0x[a-fA-F0-9]{40}$'
+}
 
-def validate_address(address: str, chain: str) -> bool:
-    """
-    Validates wallet addresses based on blockchain patterns.
-    Raises WalletValidationError for malformed inputs.
-    """
-    if not address or not isinstance(address, str):
-        raise WalletValidationError("Address must be a non-empty string")
-
-    patterns = {
-        "ETH": r"^0x[a-fA-F0-9]{40}$",
-        "BTC": r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
-    }
-
-    if chain not in patterns:
+def is_valid_address(address: str, chain: str) -> bool:
+    """Validate cryptocurrency address against chain-specific regex."""
+    pattern = ADDRESS_PATTERNS.get(chain.lower())
+    if not pattern:
         raise ValueError(f"Unsupported chain: {chain}")
+    return bool(re.match(pattern, address))
 
-    if not re.match(patterns[chain], address):
-        raise WalletValidationError(f"Invalid {chain} address format")
-
-    return True
-
-def sanitize_amount(amount: str) -> float:
-    """
-    Parses and sanitizes numeric strings for financial operations.
-    """
+def validate_amount(amount: str) -> bool:
+    """Validate numeric string for transaction amounts."""
     try:
         value = float(amount)
-        if value < 0:
-            raise WalletValidationError("Amount cannot be negative")
-        return value
+        return value > 0
     except (ValueError, TypeError):
-        raise WalletValidationError("Invalid numeric format for amount")
+        return False
+
+def validate_chain_support(chain: str) -> bool:
+    """Verify chain availability in supported networks."""
+    return chain.lower() in ADDRESS_PATTERNS.keys()
