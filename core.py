@@ -1,41 +1,44 @@
-import logging
-from typing import Optional, Dict, Any
+import re
+from typing import List
 
-logger = logging.getLogger(__name__)
+HARDENED_OFFSET = 0x80000000
 
-class CryptoTransactionError(Exception):
-    """Custom exception for wallet operations."""
-    pass
-
-def validate_transaction(data: Dict[str, Any]) -> bool:
-    """Validates mandatory transaction fields."""
-    required_fields = {'amount', 'address', 'currency'}
-    if not all(field in data for field in required_fields):
-        raise CryptoTransactionError(f"Missing fields: {required_fields - data.keys()}")
-    if data['amount'] <= 0:
-        raise CryptoTransactionError("Transaction amount must be positive")
-    return True
-
-def process_wallet_transfer(tx_data: Dict[str, Any]) -> Optional[str]:
+def parse_derivation_path(path: str) -> List[int]:
     """
-    Executes a transfer with comprehensive edge case handling.
-    Returns transaction hash on success, None on failure.
+    Parses a BIP32 derivation path string into a list of integer indices.
+    Supports standard wallet formats like "m/44'/60'/0'/0/0" or "m/44H/60H/0H/0/0".
     """
-    try:
-        validate_transaction(tx_data)
-        
-        # Simulated blockchain interaction
-        logger.info(f"Processing transfer of {tx_data['amount']} to {tx_data['address']}")
-        return "tx_hash_0xdeadbeef"
-        
-    except CryptoTransactionError as e:
-        logger.error(f"Validation failed: {e}")
-        return None
-    except Exception as e:
-        logger.exception(f"Unexpected critical failure: {e}")
-        return None
+    if not isinstance(path, str):
+        raise TypeError("Derivation path must be a string")
 
-if __name__ == "__main__":
-    sample = {'amount': 1.5, 'address': '0x123', 'currency': 'BTC'}
-    result = process_wallet_transfer(sample)
-    print(f"Result: {result}")
+    path = path.strip()
+    if not path.startswith("m"):
+        raise ValueError("Derivation path must start with 'm'")
+
+    parts = path.split("/")[1:]
+    if not parts:
+        return []
+
+    indices = []
+    for part in parts:
+        if not part:
+            raise ValueError("Empty segment in derivation path")
+
+        is_hardened = False
+        if part.endswith("'") or part.lower().endswith("h"):
+            is_hardened = True
+            part = part[:-1]
+
+        if not part.isdigit():
+            raise ValueError(f"Invalid path component: {part}")
+
+        index = int(part)
+        if index >= HARDENED_OFFSET:
+            raise ValueError(f"Index {index} exceeds maximum allowable BIP32 limit")
+
+        if is_hardened:
+            index += HARDENED_OFFSET
+
+        indices.append(index)
+
+    return indices
