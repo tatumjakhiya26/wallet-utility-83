@@ -1,57 +1,25 @@
+import hashlib
+import hmac
 from decimal import Decimal
-from typing import Optional, Union
 
+def format_crypto_amount(amount: float, precision: int = 8) -> Decimal:
+    """Converts float amount to high-precision Decimal."""
+    return Decimal(str(amount)).quantize(Decimal(f"1.{'0' * precision}"))
 
-def format_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
-    """Truncates a cryptocurrency address for UI display.
+def generate_signature(api_secret: str, payload: str) -> str:
+    """Creates HMAC-SHA256 signature for API requests."""
+    return hmac.new(
+        api_secret.encode('utf-8'),
+        payload.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
 
-    Args:
-        address: The full wallet address string.
-        prefix_len: Number of characters to retain at the start.
-        suffix_len: Number of characters to retain at the end.
-
-    Returns:
-        A shortened address string formatted like '0x1234...abcd'.
-    """
-    if not address or len(address) <= (prefix_len + suffix_len):
-        return address
-    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
-
-
-def convert_to_base_unit(
-    value: Union[int, float, str, Decimal], decimals: int = 18
-) -> Decimal:
-    """Converts a raw token amount to base unit (e.g., Wei to ETH).
-
-    Args:
-        value: Amount in smallest unit (e.g., Wei or Satoshi).
-        decimals: Number of decimal places for the token or coin.
-
-    Returns:
-        Decimal representation of the amount in base units.
-    """
-    decimal_val = Decimal(str(value))
-    factor = Decimal(10) ** decimals
-    return decimal_val / factor
-
-
-def is_valid_hex_address(address: str, expected_length: Optional[int] = 42) -> bool:
-    """Validates whether a string is a valid hex-encoded crypto address.
-
-    Args:
-        address: The wallet address string to check.
-        expected_length: Expected total character length including '0x'.
-
-    Returns:
-        True if the address is a valid hex string, False otherwise.
-    """
-    if not address.startswith("0x"):
+def validate_address_format(address: str, prefix: str = '0x') -> bool:
+    """Checks basic crypto address structure."""
+    if not address or not address.startswith(prefix):
         return False
-    if expected_length is not None and len(address) != expected_length:
-        return False
+    return len(address) == 42
 
-    try:
-        int(address[2:], 16)
-        return True
-    except ValueError:
-        return False
+def calculate_fee(amount: Decimal, fee_rate: float) -> Decimal:
+    """Computes transaction fee based on rate."""
+    return (amount * Decimal(str(fee_rate))).quantize(Decimal('0.00000001'))
