@@ -1,55 +1,32 @@
 import re
-from typing import Tuple
+from typing import Optional
 
-ETH_ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
-BTC_ADDRESS_PATTERN = re.compile(r'^(1|3|bc1q)[a-zA-HJ-NP-Z0-9]{25,59}$')
+class AddressValidationError(Exception):
+    """Custom exception for crypto address validation failures."""
+    pass
 
-
-def validate_ethereum_address(address: str) -> bool:
-    '''Validate if the given string is a correctly formatted Ethereum address.
-
-    Args:
-        address (str): The Ethereum address to validate.
-
-    Returns:
-        bool: True if the address format is valid, False otherwise.
-    '''
+def validate_eth_address(address: str) -> bool:
+    """Validates Ethereum address format with edge case handling."""
     if not isinstance(address, str):
-        return False
-    return bool(ETH_ADDRESS_PATTERN.match(address))
+        raise AddressValidationError("Address must be a string")
+    
+    if not address:
+        raise AddressValidationError("Address string is empty")
+        
+    # Check hex format and length (42 chars starting with 0x)
+    pattern = r'^0x[a-fA-F0-9]{40}$'
+    if not re.match(pattern, address):
+        raise AddressValidationError(f"Invalid address format: {address}")
+        
+    return True
 
-
-def validate_bitcoin_address(address: str) -> bool:
-    '''Validate if the given string is a likely valid Bitcoin address.
-
-    Supports Legacy (1...), Pay-to-Script-Hash (3...), and Bech32 (bc1...).
-
-    Args:
-        address (str): The Bitcoin address to validate.
-
-    Returns:
-        bool: True if the address format is valid, False otherwise.
-    '''
-    if not isinstance(address, str):
-        return False
-    return bool(BTC_ADDRESS_PATTERN.match(address))
-
-
-def validate_mnemonic(mnemonic: str, expected_words: Tuple[int, ...] = (12, 15, 18, 21, 24)) -> bool:
-    '''Validate a BIP-39 mnemonic seed phrase format and word count.
-
-    Args:
-        mnemonic (str): The space-separated mnemonic phrase.
-        expected_words (Tuple[int, ...]): Allowed word counts. Defaults to BIP-39 sizes.
-
-    Returns:
-        bool: True if the phrase format is valid, False otherwise.
-    '''
-    if not isinstance(mnemonic, str):
-        return False
-
-    words = mnemonic.strip().split()
-    if len(words) not in expected_words:
-        return False
-
-    return all(word.isalpha() for word in words)
+def sanitize_amount(amount: str) -> float:
+    """Converts string amount to float with input sanitization."""
+    try:
+        clean_amount = amount.strip().replace(',', '')
+        value = float(clean_amount)
+        if value < 0:
+            raise ValueError("Negative amount provided")
+        return value
+    except (ValueError, TypeError, AttributeError) as e:
+        raise AddressValidationError(f"Invalid balance format: {e}")
