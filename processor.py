@@ -1,35 +1,76 @@
 import logging
-from typing import List, Dict, Any
+from decimal import Decimal, InvalidOperation
+from typing import Dict, List, Any
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("wallet_processor")
 
 class TransactionProcessor:
-    """Handles crypto transaction validation and batch processing."""
+    """
+    Utility processor for handling, validating, and aggregating cryptocurrency
+    transaction records and denomination conversions.
+    """
+    def __init__(self, decimals: int = 18):
+        self.decimals = decimals
 
-    def __init__(self, network: str = "mainnet"):
-        self.network = network
+    def to_base_unit(self, amount: str) -> int:
+        """
+        Convert standard decimal float/string representation to base unit (e.g., Wei).
+        """
+        try:
+            dec_val = Decimal(str(amount))
+            return int(dec_val * (Decimal('10') ** self.decimals))
+        except (ValueError, InvalidOperation) as err:
+            logger.error(f"Conversion failure to base unit for {amount}: {err}")
+            raise ValueError(f"Invalid amount format: {amount}")
 
-    def validate_tx(self, tx: Dict[str, Any]) -> bool:
-        """Basic integrity check for raw transaction data."""
-        required_fields = {"sender", "receiver", "amount", "nonce"}
-        return all(field in tx for field in required_fields)
+    def from_base_unit(self, base_amount: int) -> Decimal:
+        """
+        Convert base unit back to standard decimal representation.
+        """
+        try:
+            return Decimal(base_amount) / (Decimal('10') ** self.decimals)
+        except (ValueError, TypeError) as err:
+            logger.error(f"Conversion failure from base unit for {base_amount}: {err}")
+            raise ValueError(f"Invalid base unit format: {base_amount}")
 
-    def process_batch(self, transactions: List[Dict[str, Any]]) -> Dict[str, int]:
-        """Filters and counts successful transactions from a list."""
-        results = {"success": 0, "failed": 0}
-        
+    def aggregate_wallet_activity(self, address: str, transactions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Filters, validates, and summarizes transaction history for a specific wallet address.
+        """
+        address_lower = address.lower()
+        total_received = Decimal('0')
+        total_sent = Decimal('0')
+        fees_paid = Decimal('0')
+        processed_count = 0
+
         for tx in transactions:
-            try:
-                if self.validate_tx(tx):
-                    results["success"] += 1
-                else:
-                    results["failed"] += 1
-            except Exception as e:
-                logger.error(f"Unexpected processing error: {e}")
-                results["failed"] += 1
-        
-        return results
+            # Verify minimum transaction fields
+            if not all(k in tx for k in ('from_address', 'to_address', 'value', 'fee')):
+                continue
 
-    def format_status(self, results: Dict[str, int]) -> str:
-        """Provides a summary string for UI or logging output."""
-        return f"Processed {sum(results.values())} txs: {results['success']} OK, {results['failed']} ERR"
+            try:
+                tx_from = str(tx['from_address']).lower()
+                tx_to = str(tx['to_address']).lower()
+                value = Decimal(str(tx['value']))
+                fee = Decimal(str(tx['fee']))
+            except (ValueError, TypeError, InvalidOperation):
+                continue
+
+            if tx_from == address_lower:
+                total_sent += value
+                fees_paid += fee
+                processed_count += 1
+            elif tx_to == address_lower:
+                total_received += value
+                processed_count += 1
+
+        net_balance_change = total_received - (total_sent + fees_paid)
+
+        return {
+            "address": address,
+            "transactions_processed": processed_count,
+            "total_received": str(total_received),
+            "total_sent": str(total_sent),
+            "fees_paid": str(fees_paid),
+            "net_balance_change": str(net_balance_change)
+        }
