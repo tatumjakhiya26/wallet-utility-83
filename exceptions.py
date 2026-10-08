@@ -1,30 +1,45 @@
-class WalletError(Exception):
-    """Base exception for all wallet operations."""
-    pass
+"""
+Custom exceptions for the wallet-utility-83 library.
+"""
 
-class InsufficientFundsError(WalletError):
-    """Raised when the wallet balance is too low for the transaction."""
-    def __init__(self, required, actual):
-        super().__init__(f"Insufficient funds: need {required}, have {actual}")
+class WalletError(Exception):
+    """Base exception for all wallet-related operations."""
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
 
 class InvalidAddressError(WalletError):
-    """Raised when a crypto address fails checksum or format validation."""
-    pass
+    """Raised when a cryptocurrency address format is invalid."""
+    def __init__(self, address: str, network: str):
+        self.address = address
+        self.network = network
+        super().__init__(f"Invalid address formatting for '{address}' on {network} network")
 
-class NetworkConnectionError(WalletError):
-    """Raised when communication with the blockchain node fails."""
-    pass
+
+class InsufficientFundsError(WalletError):
+    """Raised when a transaction's cost exceeds the available wallet balance."""
+    def __init__(self, required: float, available: float, asset: str):
+        self.required = required
+        self.available = available
+        self.asset = asset
+        super().__init__(
+            f"Insufficient balance for {asset}: required {required}, but only {available} available"
+        )
+
 
 class TransactionSigningError(WalletError):
-    """Raised when local signature generation fails."""
-    pass
+    """Raised when there is a failure during the cryptographic signing process."""
+    def __init__(self, details: str):
+        super().__init__(f"Failed to sign transaction: {details}")
 
-class RateLimitExceededError(WalletError):
-    """Raised when API calls exceed node provider thresholds."""
-    pass
 
-def handle_wallet_exception(e: Exception) -> str:
-    """Standardized logging and message extraction for UI feedback."""
-    if isinstance(e, WalletError):
-        return f"[Wallet Error]: {str(e)}"
-    return "[Internal System Error]: An unexpected issue occurred."
+class NodeConnectionError(WalletError):
+    """Raised when the wallet utility cannot communicate with the blockchain node."""
+    def __init__(self, endpoint: str, inner_exception: Exception = None):
+        self.endpoint = endpoint
+        self.inner_exception = inner_exception
+        msg = f"Failed to establish connection with node at {endpoint}"
+        if inner_exception:
+            msg += f" (Reason: {str(inner_exception)})"
+        super().__init__(msg)
