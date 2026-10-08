@@ -1,32 +1,28 @@
 import re
-from typing import Optional
 
-class AddressValidationError(Exception):
-    """Custom exception for crypto address validation failures."""
-    pass
-
-def validate_eth_address(address: str) -> bool:
-    """Validates Ethereum address format with edge case handling."""
-    if not isinstance(address, str):
-        raise AddressValidationError("Address must be a string")
-    
-    if not address:
-        raise AddressValidationError("Address string is empty")
-        
-    # Check hex format and length (42 chars starting with 0x)
+def validate_address(address: str) -> bool:
+    """Validate cryptocurrency wallet address format."""
+    # Pattern for standard hex-based wallet addresses
     pattern = r'^0x[a-fA-F0-9]{40}$'
-    if not re.match(pattern, address):
-        raise AddressValidationError(f"Invalid address format: {address}")
-        
-    return True
+    return bool(re.match(pattern, address))
 
-def sanitize_amount(amount: str) -> float:
-    """Converts string amount to float with input sanitization."""
+def validate_amount(amount: str) -> bool:
+    """Verify input is a positive numerical value."""
     try:
-        clean_amount = amount.strip().replace(',', '')
-        value = float(clean_amount)
-        if value < 0:
-            raise ValueError("Negative amount provided")
-        return value
-    except (ValueError, TypeError, AttributeError) as e:
-        raise AddressValidationError(f"Invalid balance format: {e}")
+        value = float(amount)
+        return value > 0
+    except ValueError:
+        return False
+
+def validate_transaction_data(address: str, amount: str) -> dict:
+    """Check inputs for processing readiness."""
+    errors = []
+    if not validate_address(address):
+        errors.append("Invalid wallet address format")
+    if not validate_amount(amount):
+        errors.append("Invalid amount: must be positive numeric")
+    
+    return {
+        "is_valid": len(errors) == 0,
+        "errors": errors
+    }
