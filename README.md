@@ -1,17 +1,17 @@
 # wallet-utility-83
 
-`wallet-utility-83` is a high-performance Python toolkit designed for secure management and rapid auditing of cryptocurrency addresses. It streamlines bulk balance monitoring and transaction history retrieval across EVM-compatible networks.
+`wallet-utility-83` is a lightweight Python toolkit designed for secure address generation and balance auditing across EVM-compatible chains. It streamlines multi-wallet management by providing a programmatic interface for interacting with public ledger data.
 
 ## Features
 
-*   **Multi-Chain Support:** Seamless integration with Ethereum, Polygon, and BSC nodes via high-speed JSON-RPC providers.
-*   **Encrypted Key Management:** Implements AES-256 encryption for local storage of private keys, ensuring secure handling of sensitive credentials.
-*   **Automated Audit Engine:** Performs automated reconciliation of wallet assets against on-chain data to detect discrepancies.
-*   **Concurrency Optimized:** Utilizes `asyncio` for non-blocking network requests, allowing for real-time monitoring of hundreds of addresses simultaneously.
+*   **Multi-Chain Support:** Native integration for Ethereum, Polygon, and BSC balance lookups via JSON-RPC providers.
+*   **Hierarchical Deterministic (HD) Generation:** Secure derivation of mnemonic phrases and private keys using BIP-39 standards.
+*   **Automated Auditing:** Batch scanning functionality to identify active balances across hundreds of addresses in seconds.
+*   **Encrypted Storage:** Built-in utility to export wallet metadata into AES-256 encrypted JSON files.
 
 ## Installation
 
-Ensure you have Python 3.10+ installed. Clone the repository and set up your virtual environment:
+Ensure you have Python 3.9+ installed. It is recommended to use a virtual environment.
 
 ```bash
 git clone https://github.com/Developer/wallet-utility-83.git
@@ -23,21 +23,25 @@ pip install -r requirements.txt
 
 ## Usage
 
-Initialize the utility by providing your node provider URL to track real-time wallet balances:
+To generate a new wallet and check its balance on the Ethereum mainnet, use the following implementation:
 
 ```python
-from wallet_utility import WalletMonitor
+from wallet_utility import WalletManager
 
-# Initialize with provider
-monitor = WalletMonitor(rpc_url="https://mainnet.infura.io/v3/YOUR_KEY")
+# Initialize manager
+wm = WalletManager(provider_url="https://eth.llamarpc.com")
 
-# Check balance of an address
-balance = monitor.get_balance("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
+# Generate new identity
+wallet = wm.create_wallet()
+print(f"Address: {wallet.address}")
+
+# Query balance
+balance = wm.get_balance(wallet.address)
 print(f"Current Balance: {balance} ETH")
 ```
 
 ## License
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Distributed under the MIT License. See `LICENSE` for more information.
