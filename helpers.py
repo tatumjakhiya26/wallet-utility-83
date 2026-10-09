@@ -1,24 +1,30 @@
 import decimal
 from typing import Union
 
-def format_sats(amount: Union[int, float, str]) -> decimal.Decimal:
-    """Converts raw satoshi values to standard BTC format."""
-    return decimal.Decimal(amount) / decimal.Decimal(10**8)
+# Set precision for crypto calculations
+DECIMAL_CONTEXT = decimal.Context(prec=28, rounding=decimal.ROUND_HALF_UP)
 
-def validate_address(address: str) -> bool:
-    """Basic length check for crypto wallet addresses."""
-    return 26 <= len(address) <= 35
+def to_base_unit(amount: Union[int, float, str], decimals: int = 18) -> int:
+    """Converts human-readable crypto amount to base atomic units."""
+    val = decimal.Decimal(str(amount))
+    multiplier = decimal.Decimal(10) ** decimals
+    return int((val * multiplier).to_integral_value())
 
-def calculate_fee(gas_price: int, gas_limit: int) -> int:
-    """Calculates total transaction fee in wei/sats."""
-    return int(gas_price * gas_limit)
+def from_base_unit(amount: int, decimals: int = 18) -> decimal.Decimal:
+    """Converts atomic units back to decimal format."""
+    val = decimal.Decimal(amount)
+    divisor = decimal.Decimal(10) ** decimals
+    return val / divisor
 
-def wei_to_ether(wei: int) -> float:
-    """Converts wei units to ether float value."""
-    return float(wei) / 10**18
+def format_crypto(amount: decimal.Decimal, precision: int = 8) -> str:
+    """Formats decimal objects for display purposes."""
+    template = f"{{:.{precision}f}}"
+    return template.format(amount.normalize())
 
-def mask_address(address: str) -> str:
-    """Masks sensitive address string for logging."""
-    if len(address) < 10:
-        return "****"
-    return f"{address[:6]}...{address[-4:]}"
+def validate_address(address: str, prefix: str = '0x', length: int = 42) -> bool:
+    """Basic validation for crypto wallet address strings."""
+    if not address.startswith(prefix):
+        return False
+    if len(address) != length:
+        return False
+    return address[len(prefix):].isalnum()
