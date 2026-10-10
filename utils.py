@@ -1,33 +1,50 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
+from typing import List, Optional, Union
+from decimal import Decimal
 
-logger = logging.getLogger(__name__)
+def format_crypto_amount(amount: Union[str, float, Decimal], decimals: int = 8) -> str:
+    """
+    Formats crypto amounts to a fixed decimal precision string.
 
-def retry_network_op(retries: int = 3, delay: float = 2.0, backoff: float = 2.0):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    if attempt == retries - 1:
-                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
-                        raise
-                    
-                    logger.warning(f"Attempt {attempt + 1} failed for {func.__name__}, retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
+    Args:
+        amount: The numeric value to format.
+        decimals: Number of decimal places to include.
 
-@retry_network_op(retries=3, delay=1.0)
-def fetch_balance(address: str):
-    """Example network operation for crypto balance lookup."""
-    # Simulation of network request logic
-    pass
+    Returns:
+        A string representation of the formatted amount.
+    """
+    value = Decimal(str(amount))
+    return f"{value:.{decimals}f}"
+
+def validate_address(address: str, chain: str) -> bool:
+    """
+    Checks if the provided string is a valid address for the given chain.
+
+    Args:
+        address: The wallet address string.
+        chain: The identifier for the blockchain (e.g., 'BTC', 'ETH').
+
+    Returns:
+        Boolean indicating validity.
+    """
+    if not address or len(address) < 26:
+        return False
+
+    if chain == 'BTC':
+        return address.startswith(('1', '3', 'bc1'))
+    elif chain == 'ETH':
+        return address.startswith('0x') and len(address) == 42
+    
+    return False
+
+def calculate_fee(amount: Decimal, rate: float) -> Decimal:
+    """
+    Computes transaction fee based on amount and network rate.
+
+    Args:
+        amount: The total amount in the transaction.
+        rate: The fee rate multiplier.
+
+    Returns:
+        The calculated fee as a Decimal object.
+    """
+    return amount * Decimal(str(rate))
