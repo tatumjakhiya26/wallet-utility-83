@@ -1,28 +1,28 @@
+import functools
 import re
+from typing import Dict, Any
 
-def validate_address(address: str) -> bool:
-    """Validate cryptocurrency wallet address format."""
-    # Pattern for standard hex-based wallet addresses
-    pattern = r'^0x[a-fA-F0-9]{40}$'
-    return bool(re.match(pattern, address))
+# Compiled regex for address validation to improve throughput
+ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
 
-def validate_amount(amount: str) -> bool:
-    """Verify input is a positive numerical value."""
-    try:
-        value = float(amount)
-        return value > 0
-    except ValueError:
+@functools.lru_cache(maxsize=1024)
+def is_valid_address(address: str) -> bool:
+    """Validate hex address using cached pattern matching."""
+    if not isinstance(address, str):
         return False
+    return bool(ADDRESS_PATTERN.match(address))
 
-def validate_transaction_data(address: str, amount: str) -> dict:
-    """Check inputs for processing readiness."""
-    errors = []
-    if not validate_address(address):
-        errors.append("Invalid wallet address format")
-    if not validate_amount(amount):
-        errors.append("Invalid amount: must be positive numeric")
-    
-    return {
-        "is_valid": len(errors) == 0,
-        "errors": errors
-    }
+def validate_transaction_batch(transactions: list) -> Dict[str, Any]:
+    """Batch processing with memoization for repeated addresses."""
+    results = {"valid": 0, "invalid": 0}
+    for tx in transactions:
+        addr = tx.get("to")
+        if is_valid_address(addr):
+            results["valid"] += 1
+        else:
+            results["invalid"] += 1
+    return results
+
+def clear_validation_cache():
+    """Manual cache clearance for memory management."""
+    is_valid_address.cache_clear()
