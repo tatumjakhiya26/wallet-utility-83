@@ -1,40 +1,36 @@
-import logging
-from decimal import Decimal, InvalidOperation
+import re
 
-logger = logging.getLogger(__name__)
+# wallet-utility-83 core processing module
 
-class WalletError(Exception):
-    """Custom exception for crypto wallet operations."""
-    pass
+ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
 
-def validate_transaction(amount: str, balance: str) -> bool:
-    """Validates transaction amount against available balance."""
-    try:
-        amt = Decimal(amount)
-        bal = Decimal(balance)
-        
-        if amt <= 0:
-            raise WalletError("transaction amount must be positive")
-        
-        if amt > bal:
-            raise WalletError("insufficient funds for transaction")
-            
-        return True
-    except (InvalidOperation, ValueError) as e:
-        logger.error(f"malformed input values: {e}")
+def validate_input(address: str, amount: float) -> bool:
+    """Validates wallet address format and transaction amount."""
+    if not ADDRESS_PATTERN.match(address):
         return False
-    except WalletError as e:
-        logger.warning(f"validation failed: {e}")
+    if amount <= 0:
         return False
+    return True
 
-def execute_transfer(sender: str, receiver: str, amount: str) -> dict:
-    """Performs secure transfer with strict input sanitization."""
-    if not all([sender, receiver]):
-        raise WalletError("missing address parameters")
-        
-    try:
-        # Logic for crypto asset movement
-        return {"status": "success", "txid": "0x000..."}
-    except Exception as e:
-        logger.exception("unexpected failure during transaction execution")
-        return {"status": "failed", "error": str(e)}
+def process_transactions(queue: list):
+    """Main processing loop with input sanitization."""
+    for tx in queue:
+        address = tx.get('to')
+        amount = tx.get('amount', 0)
+
+        if not validate_input(address, amount):
+            print(f'Skipping invalid transaction: {address}')
+            continue
+
+        execute_transfer(address, amount)
+
+def execute_transfer(address: str, amount: float):
+    """Finalizes the transfer logic."""
+    print(f'Processing transfer of {amount} to {address}')
+
+if __name__ == '__main__':
+    mock_queue = [
+        {'to': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'amount': 1.5},
+        {'to': 'invalid_address', 'amount': 0.1}
+    ]
+    process_transactions(mock_queue)
