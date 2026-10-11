@@ -1,35 +1,65 @@
+import os
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+from typing import Optional
 
-def setup_logger(name: str, log_file: str = "wallet.log") -> logging.Logger:
-    """Initializes a rotating logger for wallet operations."""
+LOG_DIR = "logs"
+DEFAULT_LOG_FILE = "wallet_utility.log"
+DEFAULT_LOG_LEVEL = logging.INFO
+MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+BACKUP_COUNT = 5
+
+
+def setup_logger(
+    name: str = "wallet_utility",
+    log_file: Optional[str] = None,
+    level: int = DEFAULT_LOG_LEVEL,
+    max_bytes: int = MAX_BYTES,
+    backup_count: int = BACKUP_COUNT,
+) -> logging.Logger:
+    """
+    Configures and returns a Logger instance with console and rotating file handlers.
+    Designed for tracking wallet operations and transaction logs securely.
+    """
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
-    # Prevent duplicate handlers if logger is re-initialized
-    if not logger.handlers:
-        # 5MB per file, keep 3 backup files
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        
-        # Optional: Log to console as well
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+    # Avoid duplicate handlers if logger is already configured
+    if logger.handlers:
+        return logger
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
+    logger.addHandler(console_handler)
+
+    # Rotating File Handler
+    if log_file is None:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        log_file = os.path.join(LOG_DIR, DEFAULT_LOG_FILE)
+    else:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+
+    file_handler = RotatingFileHandler(
+        filename=log_file,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(level)
+    logger.addHandler(file_handler)
 
     return logger
 
-# Usage example
-if __name__ == "__main__":
-    log = setup_logger("wallet_utility_83")
-    log.info("Logger initialized successfully")
+
+# Pre-configured logger for general wallet operations
+wallet_logger = setup_logger("wallet_core")
