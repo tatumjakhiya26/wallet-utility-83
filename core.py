@@ -1,36 +1,43 @@
-import re
+import logging
+from typing import Optional
 
-# wallet-utility-83 core processing module
+# Configure logging for wallet operations
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('wallet-utility-83')
 
-ADDRESS_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
+class WalletError(Exception):
+    """Custom exception for wallet operation failures."""
+    pass
 
-def validate_input(address: str, amount: float) -> bool:
-    """Validates wallet address format and transaction amount."""
-    if not ADDRESS_PATTERN.match(address):
+def validate_address(address: str) -> bool:
+    """Check if address length and prefix are valid."""
+    if not isinstance(address, str) or len(address) < 26:
         return False
-    if amount <= 0:
-        return False
-    return True
+    return address.startswith('0x') or address.startswith('bc1')
 
-def process_transactions(queue: list):
-    """Main processing loop with input sanitization."""
-    for tx in queue:
-        address = tx.get('to')
-        amount = tx.get('amount', 0)
+def process_transaction(recipient: str, amount: float) -> Optional[str]:
+    """
+    Execute transaction with validation and error handling.
+    Returns transaction hash or None on failure.
+    """
+    try:
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+        
+        if not validate_address(recipient):
+            raise WalletError(f"Invalid address format: {recipient}")
 
-        if not validate_input(address, amount):
-            print(f'Skipping invalid transaction: {address}')
-            continue
+        logger.info(f"Processing {amount} to {recipient}")
+        # Simulation of transaction hash generation
+        tx_hash = "tx_" + recipient[:8]
+        return tx_hash
 
-        execute_transfer(address, amount)
-
-def execute_transfer(address: str, amount: float):
-    """Finalizes the transfer logic."""
-    print(f'Processing transfer of {amount} to {address}')
-
-if __name__ == '__main__':
-    mock_queue = [
-        {'to': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'amount': 1.5},
-        {'to': 'invalid_address', 'amount': 0.1}
-    ]
-    process_transactions(mock_queue)
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        return None
+    except WalletError as e:
+        logger.error(f"Wallet operation error: {e}")
+        return None
+    except Exception as e:
+        logger.critical(f"Unexpected system failure: {e}")
+        return None
