@@ -9,28 +9,21 @@ DEFAULT_CONFIG = {
     "log_level": "INFO"
 }
 
-def load_config(path: str = "config.json") -> Dict[str, Any]:
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
     """Loads configuration from file with fallback to defaults."""
     config = DEFAULT_CONFIG.copy()
-    
-    if os.path.exists(path):
+
+    if os.path.exists(config_path):
         try:
-            with open(path, "r") as f:
+            with open(config_path, "r") as f:
                 user_config = json.load(f)
                 config.update(user_config)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: failed to load config file: {e}. Using defaults.")
-            
+            print(f"Warning: Failed to load config file: {e}. Using defaults.")
+
     return config
 
-class ConfigManager:
-    """Thread-safe-ish configuration access for wallet operations."""
-    def __init__(self, path: str = "config.json"):
-        self._data = load_config(path)
-        
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._data.get(key, default)
-
-    @property
-    def rpc_url(self) -> str:
-        return self._data.get("rpc_url", DEFAULT_CONFIG["rpc_url"])
+def get_setting(key: str, default: Any = None) -> Any:
+    """Helper to retrieve specific config values."""
+    config = load_config()
+    return config.get(key, default)
