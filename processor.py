@@ -1,76 +1,63 @@
-import logging
-from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Any
+from dataclasses import dataclass, field
+from typing import List, Dict
+import re
 
-logger = logging.getLogger("wallet_processor")
 
-class TransactionProcessor:
-    """
-    Utility processor for handling, validating, and aggregating cryptocurrency
-    transaction records and denomination conversions.
-    """
-    def __init__(self, decimals: int = 18):
-        self.decimals = decimals
+@dataclass
+class WalletEntry:
+    address: str
+    chain: str
+    balance: float = 0.0
+    is_active: bool = True
+    tags: List[str] = field(default_factory=list)
 
-    def to_base_unit(self, amount: str) -> int:
-        """
-        Convert standard decimal float/string representation to base unit (e.g., Wei).
-        """
-        try:
-            dec_val = Decimal(str(amount))
-            return int(dec_val * (Decimal('10') ** self.decimals))
-        except (ValueError, InvalidOperation) as err:
-            logger.error(f"Conversion failure to base unit for {amount}: {err}")
-            raise ValueError(f"Invalid amount format: {amount}")
 
-    def from_base_unit(self, base_amount: int) -> Decimal:
-        """
-        Convert base unit back to standard decimal representation.
-        """
-        try:
-            return Decimal(base_amount) / (Decimal('10') ** self.decimals)
-        except (ValueError, TypeError) as err:
-            logger.error(f"Conversion failure from base unit for {base_amount}: {err}")
-            raise ValueError(f"Invalid base unit format: {base_amount}")
+class WalletDataProcessor:
+    """Processor for cleaning and reorganizing crypto wallet records."""
 
-    def aggregate_wallet_activity(self, address: str, transactions: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Filters, validates, and summarizes transaction history for a specific wallet address.
-        """
-        address_lower = address.lower()
-        total_received = Decimal('0')
-        total_sent = Decimal('0')
-        fees_paid = Decimal('0')
-        processed_count = 0
+    ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+    BTC_ADDRESS_REGEX = re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$")
 
-        for tx in transactions:
-            # Verify minimum transaction fields
-            if not all(k in tx for k in ('from_address', 'to_address', 'value', 'fee')):
+    def __init__(self, raw_entries: List[Dict]):
+        self.raw_entries = raw_entries
+
+    def sanitize_address(self, address: str) -> str:
+        """Strip whitespace and normalize EVM hex addresses to lowercase."""
+        clean = address.strip()
+        if clean.startswith("0x"):
+            return clean.lower()
+        return clean
+
+    def validate_and_parse(self) -> List[WalletEntry]:
+        """Validate raw dictionary items into structured WalletEntry objects."""
+        processed = []
+        for item in self.raw_entries:
+            raw_addr = item.get("address", "")
+            clean_addr = self.sanitize_address(raw_addr)
+            chain = item.get("chain", "ethereum").lower()
+
+            if chain == "ethereum" and not self.ETH_ADDRESS_REGEX.match(clean_addr):
+                continue
+            if chain == "bitcoin" and not self.BTC_ADDRESS_REGEX.match(clean_addr):
                 continue
 
-            try:
-                tx_from = str(tx['from_address']).lower()
-                tx_to = str(tx['to_address']).lower()
-                value = Decimal(str(tx['value']))
-                fee = Decimal(str(tx['fee']))
-            except (ValueError, TypeError, InvalidOperation):
-                continue
+            entry = WalletEntry(
+                address=clean_addr,
+                chain=chain,
+                balance=float(item.get("balance", 0.0)),
+                is_active=bool(item.get("is_active", True)),
+                tags=[t.strip().lower() for t in item.get("tags", [])]
+            )
+            processed.append(entry)
+        return processed
 
-            if tx_from == address_lower:
-                total_sent += value
-                fees_paid += fee
-                processed_count += 1
-            elif tx_to == address_lower:
-                total_received += value
-                processed_count += 1
+    def reorganize_by_chain(self, entries: List[WalletEntry]) -> Dict[str, List[WalletEntry]]:
+        """Group processed entries by blockchain network sorted by balance."""
+        grouped: Dict[str, List[WalletEntry]] = {}
+        for entry in entries:
+            grouped.setdefault(entry.chain, []).append(entry)
 
-        net_balance_change = total_received - (total_sent + fees_paid)
+        for chain in grouped:
+            grouped[chain].sort(key=lambda x: x.balance, reverse=True)
 
-        return {
-            "address": address,
-            "transactions_processed": processed_count,
-            "total_received": str(total_received),
-            "total_sent": str(total_sent),
-            "fees_paid": str(fees_paid),
-            "net_balance_change": str(net_balance_change)
-        }
+        return grouped
