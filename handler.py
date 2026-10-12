@@ -1,57 +1,37 @@
-import time
-import random
-import logging
-import json
-import urllib.error
-import urllib.request
-from typing import Callable, Any, Type, Tuple
+import re
+from typing import Dict, Any
 
-logger = logging.getLogger(__name__)
+def validate_address(address: str) -> bool:
+    # Matches standard hex-encoded crypto addresses
+    pattern = r'^0x[a-fA-F0-9]{40}$'
+    return bool(re.match(pattern, address))
 
+def process_transaction(data: Dict[str, Any]) -> None:
+    """
+    Main processing loop for incoming crypto wallet requests.
+    Ensures input integrity before blockchain execution.
+    """
+    required_fields = ['address', 'amount']
+    
+    for field in required_fields:
+        if field not in data:
+            raise ValueError(f'Missing required field: {field}')
 
-class NetworkError(Exception):
-    """Custom exception for persistent network failures."""
-    pass
+    address = data['address']
+    amount = data['amount']
 
+    if not validate_address(address):
+        raise ValueError(f'Invalid blockchain address format: {address}')
 
-def retry_network_op(
-    max_retries: int = 3,
-    base_delay: float = 1.0,
-    backoff_factor: float = 2.0,
-    exceptions: Tuple[Type[Exception], ...] = (urllib.error.URLError, TimeoutError, NetworkError)
-) -> Callable:
-    """Decorator to retry network requests with exponential backoff."""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = base_delay
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as err:
-                    if attempt == max_retries:
-                        logger.error(f"Failed '{func.__name__}' after {max_retries} attempts: {err}")
-                        raise NetworkError(f"Operation {func.__name__} failed: {err}") from err
-                    
-                    jitter = random.uniform(0.05, 0.25)
-                    sleep_time = (delay * backoff_factor) + jitter
-                    logger.warning(
-                        f"Attempt {attempt}/{max_retries} for '{func.__name__}' failed: {err}. "
-                        f"Retrying in {sleep_time:.2f}s..."
-                    )
-                    time.sleep(sleep_time)
-                    delay = sleep_time
-        return wrapper
-    return decorator
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        raise ValueError('Amount must be a positive numeric value')
 
+    # Proceed with transaction logic
+    print(f'Processing transfer of {amount} to {address}')
 
-@retry_network_op(max_retries=3, base_delay=0.5)
-def fetch_json_rpc(endpoint_url: str, payload: dict, timeout: int = 10) -> dict:
-    """Executes a JSON-RPC request to a crypto node with automatic retries."""
-    headers = {"Content-Type": "application/json"}
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(endpoint_url, data=data, headers=headers, method="POST")
-
-    with urllib.request.urlopen(req, timeout=timeout) as response:
-        if response.status != 200:
-            raise NetworkError(f"HTTP Status {response.status}")
-        return json.loads(response.read().decode("utf-8"))
+if __name__ == '__main__':
+    sample_payload = {'address': '0x1234567890123456789012345678901234567890', 'amount': 1.5}
+    try:
+        process_transaction(sample_payload)
+    except ValueError as e:
+        print(f'Validation failed: {e}')
