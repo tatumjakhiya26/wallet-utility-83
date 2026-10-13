@@ -1,63 +1,36 @@
-from dataclasses import dataclass, field
-from typing import List, Dict
-import re
+import logging
 
+logger = logging.getLogger(__name__)
 
-@dataclass
-class WalletEntry:
-    address: str
-    chain: str
-    balance: float = 0.0
-    is_active: bool = True
-    tags: List[str] = field(default_factory=list)
+class TransactionError(Exception):
+    """Base exception for transaction processing"""
+    pass
 
+def process_transaction(wallet_address: str, amount: float) -> dict:
+    """Validates and processes crypto transaction with robust error handling"""
+    try:
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise ValueError("Invalid transaction amount: must be positive numeric")
+        
+        if len(wallet_address) != 42 or not wallet_address.startswith('0x'):
+            raise ValueError("Invalid wallet address format")
 
-class WalletDataProcessor:
-    """Processor for cleaning and reorganizing crypto wallet records."""
+        # Simulated processing logic
+        status = {"status": "success", "address": wallet_address, "amount": amount}
+        logger.info(f"Processed {amount} for {wallet_address}")
+        return status
 
-    ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
-    BTC_ADDRESS_REGEX = re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$")
+    except ValueError as ve:
+        logger.error(f"Validation failure: {ve}")
+        return {"status": "failed", "error": str(ve)}
+    except Exception as e:
+        logger.critical(f"Unexpected system error: {e}")
+        return {"status": "error", "error": "internal system failure"}
 
-    def __init__(self, raw_entries: List[Dict]):
-        self.raw_entries = raw_entries
-
-    def sanitize_address(self, address: str) -> str:
-        """Strip whitespace and normalize EVM hex addresses to lowercase."""
-        clean = address.strip()
-        if clean.startswith("0x"):
-            return clean.lower()
-        return clean
-
-    def validate_and_parse(self) -> List[WalletEntry]:
-        """Validate raw dictionary items into structured WalletEntry objects."""
-        processed = []
-        for item in self.raw_entries:
-            raw_addr = item.get("address", "")
-            clean_addr = self.sanitize_address(raw_addr)
-            chain = item.get("chain", "ethereum").lower()
-
-            if chain == "ethereum" and not self.ETH_ADDRESS_REGEX.match(clean_addr):
-                continue
-            if chain == "bitcoin" and not self.BTC_ADDRESS_REGEX.match(clean_addr):
-                continue
-
-            entry = WalletEntry(
-                address=clean_addr,
-                chain=chain,
-                balance=float(item.get("balance", 0.0)),
-                is_active=bool(item.get("is_active", True)),
-                tags=[t.strip().lower() for t in item.get("tags", [])]
-            )
-            processed.append(entry)
-        return processed
-
-    def reorganize_by_chain(self, entries: List[WalletEntry]) -> Dict[str, List[WalletEntry]]:
-        """Group processed entries by blockchain network sorted by balance."""
-        grouped: Dict[str, List[WalletEntry]] = {}
-        for entry in entries:
-            grouped.setdefault(entry.chain, []).append(entry)
-
-        for chain in grouped:
-            grouped[chain].sort(key=lambda x: x.balance, reverse=True)
-
-        return grouped
+def batch_process(transactions: list) -> list:
+    """Handles batch processing with individual item error isolation"""
+    results = []
+    for tx in transactions:
+        res = process_transaction(tx.get('addr', ''), tx.get('amt', 0))
+        results.append(res)
+    return results
