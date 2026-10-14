@@ -1,36 +1,24 @@
 import logging
-import os
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+import os
 
-LOG_DIR = Path("logs")
-LOG_FILE = LOG_DIR / "wallet_utility.log"
-MAX_BYTES = 5 * 1024 * 1024  # 5MB
-BACKUP_COUNT = 3
-
-def setup_logger(name: str = "wallet-utility") -> logging.Logger:
-    """Configures a rotating file logger for the application."""
-    if not LOG_DIR.exists():
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-
+def setup_logger(name: str, log_file: str = 'wallet.log', level: int = logging.INFO) -> logging.Logger:
+    """Configures a rotating file logger for crypto operations."""
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
-    # Prevent duplicate handlers if setup_logger is called multiple times
+    # Prevent duplicate handlers if logger is re-initialized
     if not logger.handlers:
         formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-        # Rotating file handler
+        # 5MB log file size, keep 3 backups
         file_handler = RotatingFileHandler(
-            LOG_FILE, 
-            maxBytes=MAX_BYTES, 
-            backupCount=BACKUP_COUNT
+            log_file, maxBytes=5*1024*1024, backupCount=3
         )
         file_handler.setFormatter(formatter)
-        
-        # Console output for visibility
+
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
 
