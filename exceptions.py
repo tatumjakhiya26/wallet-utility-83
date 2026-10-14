@@ -1,23 +1,25 @@
 class WalletError(Exception):
-    """Base exception for all wallet-utility-83 errors."""
+    """Base exception for wallet-utility-83 operations."""
     pass
 
-class InsufficientFundsError(WalletError):
-    """Raised when transaction amount exceeds balance."""
+class InsufficientBalanceError(WalletError):
+    """Raised when transaction amount exceeds available funds."""
     pass
 
 class InvalidAddressError(WalletError):
-    """Raised when the destination address is malformed."""
+    """Raised when a crypto address format is invalid."""
     pass
 
-class ConnectionTimeoutError(WalletError):
-    """Raised when node connectivity times out."""
+class NetworkConnectionError(WalletError):
+    """Raised when the blockchain node is unreachable."""
     pass
 
-class SigningError(WalletError):
-    """Raised during cryptographic signing failures."""
+class SecurityAlertError(WalletError):
+    """Raised for suspicious activity or auth failures."""
     pass
 
-class RateLimitError(WalletError):
-    """Raised when API requests exceed threshold."""
-    pass
+def handle_wallet_exception(e: Exception) -> str:
+    """Format wallet exceptions for logging and user display."""
+    if isinstance(e, WalletError):
+        return f"[Wallet Error]: {str(e)}"
+    return f"[Unexpected Error]: {type(e).__name__} - {str(e)}"
