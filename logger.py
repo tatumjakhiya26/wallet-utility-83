@@ -1,28 +1,31 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from typing import Optional
 
-def setup_logger(name: str, log_file: str = 'wallet.log', level: int = logging.INFO) -> logging.Logger:
-    """Configures a rotating file logger for crypto operations."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class WalletLogger:
+    """Standardized logging utility for crypto operations."""
 
-    # Prevent duplicate handlers if logger is re-initialized
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+    def __init__(self, name: str = 'wallet-utility-83') -> None:
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
 
-        # 5MB log file size, keep 3 backups
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=5*1024*1024, backupCount=3
-        )
-        file_handler.setFormatter(formatter)
+    def log_error(self, message: str, exc: Optional[Exception] = None) -> None:
+        """Graceful handling of operational exceptions."""
+        if exc:
+            error_detail = f"{message}: {type(exc).__name__} - {str(exc)}"
+            self.logger.error(error_detail)
+        else:
+            self.logger.error(message)
 
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
+    def log_event(self, event: str, metadata: dict) -> None:
+        """Sanitized logging of transaction metadata."""
+        try:
+            self.logger.info(f"EVENT: {event} | DATA: {str(metadata)}")
+        except (ValueError, TypeError) as e:
+            self.log_error("serialization failure during logging", e)
 
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-
-    return logger
+logger = WalletLogger()
