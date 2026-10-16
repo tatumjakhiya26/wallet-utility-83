@@ -1,38 +1,29 @@
-import re
+import time
+import functools
+import requests
+from typing import Callable, Any
 
-class AddressValidationError(Exception):
-    """Custom exception for crypto address validation issues."""
-    pass
+def retry_network_operation(max_attempts: int = 3, delay: float = 1.0):
+    """Decorator to retry network operations on failure."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except (requests.exceptions.RequestException, ConnectionError) as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        time.sleep(delay * (2 ** attempt))
+                        continue
+            raise last_exception
+        return wrapper
+    return decorator
 
-def validate_eth_address(address: str) -> bool:
-    """
-    Validates Ethereum-like hex addresses with basic pattern matching.
-    Ensures hex format and proper length constraints.
-    """
-    if not isinstance(address, str):
-        raise AddressValidationError("Address must be a string")
-
-    if not re.match(r"^0x[a-fA-F0-9]{40}$", address):
-        raise AddressValidationError(f"Invalid Ethereum address format: {address}")
-
-    return True
-
-def validate_amount(amount: str) -> float:
-    """
-    Parses and validates numeric amount inputs for transaction safety.
-    """
-    try:
-        value = float(amount)
-        if value <= 0:
-            raise ValueError("Amount must be a positive number")
-        return value
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid transaction amount: {amount}") from e
-
-def sanitize_input(data: str) -> str:
-    """
-    Strips whitespace and ensures data integrity before processing.
-    """
-    if not data:
-        return ""
-    return str(data).strip()
+@retry_network_operation(max_attempts=3, delay=2.0)
+def fetch_wallet_balance(api_url: str) -> dict:
+    """Fetches balance with built-in retry logic."""
+    response = requests.get(api_url, timeout=10)
+    response.raise_for_status()
+    return response.json()
