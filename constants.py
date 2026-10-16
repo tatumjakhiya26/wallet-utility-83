@@ -1,29 +1,30 @@
-import enum
+from typing import Final, Dict, List
 
-class WalletError(enum.Enum):
-    """Standardized error identifiers for wallet operations."""
-    INSUFFICIENT_FUNDS = "ERR_001"
-    INVALID_ADDRESS = "ERR_002"
-    NETWORK_TIMEOUT = "ERR_003"
-    TRANSACTION_REJECTED = "ERR_004"
-    DATABASE_LOCK_FAILURE = "ERR_005"
+# Configuration constants for wallet-utility-83
 
-# Network and transaction configuration constants
-MAX_RETRIES = 3
-TIMEOUT_SECONDS = 30
-MIN_CONFIRMATIONS = 6
+MIN_CONFIRMATIONS: Final[int] = 6
+MAX_GAS_LIMIT: Final[int] = 500000
 
-# HTTP status codes for external RPC calls
-HTTP_OK = 200
-HTTP_BAD_REQUEST = 400
-HTTP_UNAUTHORIZED = 401
-HTTP_SERVICE_UNAVAILABLE = 503
+SUPPORTED_NETWORKS: Final[List[str]] = [
+    "mainnet",
+    "testnet",
+    "sepolia"
+]
 
-# Error mapping for user-facing messaging
-ERROR_MESSAGES = {
-    WalletError.INSUFFICIENT_FUNDS: "Account balance below required transaction amount.",
-    WalletError.INVALID_ADDRESS: "The provided wallet address format is invalid.",
-    WalletError.NETWORK_TIMEOUT: "Connection to RPC node timed out.",
-    WalletError.TRANSACTION_REJECTED: "Transaction was declined by the network.",
-    WalletError.DATABASE_LOCK_FAILURE: "System is currently busy processing another write."
+DEFAULT_TIMEOUT: Final[float] = 30.0
+
+NETWORK_RPC_URLS: Final[Dict[str, str]] = {
+    "mainnet": "https://mainnet.infura.io/v3/",
+    "testnet": "https://goerli.infura.io/v3/",
+    "sepolia": "https://sepolia.infura.io/v3/"
 }
+
+ERROR_MESSAGES: Final[Dict[str, str]] = {
+    "insufficient_funds": "Address lacks balance for this transaction",
+    "invalid_address": "Provided address format is unsupported",
+    "network_timeout": "Remote node connection timed out"
+}
+
+def get_rpc_url(network: str) -> str:
+    """Return RPC URL for a given network name."""
+    return NETWORK_RPC_URLS.get(network, "")
