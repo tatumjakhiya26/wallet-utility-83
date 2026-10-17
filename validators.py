@@ -1,29 +1,37 @@
-import time
-import functools
-import requests
-from typing import Callable, Any
+import re
+from typing import Optional
 
-def retry_network_operation(max_attempts: int = 3, delay: float = 1.0):
-    """Decorator to retry network operations on failure."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except (requests.exceptions.RequestException, ConnectionError) as e:
-                    last_exception = e
-                    if attempt < max_attempts - 1:
-                        time.sleep(delay * (2 ** attempt))
-                        continue
-            raise last_exception
-        return wrapper
-    return decorator
 
-@retry_network_operation(max_attempts=3, delay=2.0)
-def fetch_wallet_balance(api_url: str) -> dict:
-    """Fetches balance with built-in retry logic."""
-    response = requests.get(api_url, timeout=10)
-    response.raise_for_status()
-    return response.json()
+def is_valid_eth_address(address: str) -> bool:
+    """Validate EVM/Ethereum wallet address format."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+
+
+def is_valid_btc_address(address: str) -> bool:
+    """Validate basic Legacy, P2SH, or Bech32 Bitcoin address format."""
+    if not isinstance(address, str):
+        return False
+    btc_pattern = r"^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-0-9ac-hj-np-z]{8,87})$"
+    return bool(re.match(btc_pattern, address))
+
+
+def is_valid_tx_hash(tx_hash: str) -> bool:
+    """Check if a string matches standard 32-byte hex transaction hash format."""
+    if not isinstance(tx_hash, str):
+        return False
+    pattern = r"^(0x)?[a-fA-F0-9]{64}$"
+    return bool(re.match(pattern, tx_hash))
+
+
+def sanitize_address(address: str) -> Optional[str]:
+    """Strip whitespaces and return normalized lower-case address if valid."""
+    if not address or not isinstance(address, str):
+        return None
+    cleaned = address.strip()
+    if is_valid_eth_address(cleaned):
+        return cleaned.lower()
+    if is_valid_btc_address(cleaned):
+        return cleaned
+    return None
