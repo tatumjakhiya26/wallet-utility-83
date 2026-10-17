@@ -1,33 +1,33 @@
-import hashlib
 import os
-from typing import Optional
+import json
+from typing import Any, Dict
 
-def generate_address_checksum(address: str) -> str:
-    """Generates a checksum for EIP-55 compatibility."""
-    address = address.lower().replace("0x", "")
-    hash_result = hashlib.sha3_256(address.encode()).hexdigest()
-    checksum = "0x"
-    for i in range(len(address)):
-        if int(hash_result[i], 16) >= 8:
-            checksum += address[i].upper()
-        else:
-            checksum += address[i]
-    return checksum
+DEFAULT_CONFIG = {
+    "rpc_url": "https://mainnet.infura.io/v3/",
+    "timeout": 30,
+    "retry_attempts": 3,
+    "log_level": "INFO"
+}
 
-def validate_mnemonic(mnemonic: str) -> bool:
-    """Checks if a 12 or 24 word mnemonic phrase is valid."""
-    words = mnemonic.strip().split()
-    return len(words) in [12, 24]
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """
+    Load configuration from file or return default values.
+    """
+    config = DEFAULT_CONFIG.copy()
 
-def secure_random_bytes(length: int = 32) -> bytes:
-    """Generates cryptographically secure random bytes."""
-    return os.urandom(length)
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: could not load config file: {e}. Using defaults.")
+    
+    return config
 
-def format_wei_to_eth(wei: int) -> float:
-    """Converts wei unit to human-readable eth."""
-    return wei / 10**18
-
-def sanitize_address(address: str) -> str:
-    """Ensures address is lowercase with 0x prefix."""
-    clean = address.lower().strip()
-    return clean if clean.startswith("0x") else f"0x{clean}"
+def get_config_value(key: str, default: Any = None) -> Any:
+    """
+    Fetch specific configuration setting with fallback.
+    """
+    config = load_config()
+    return config.get(key, default)
