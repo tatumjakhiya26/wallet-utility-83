@@ -1,43 +1,63 @@
-import logging
-from typing import Optional
-
-# Configure logging for wallet operations
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('wallet-utility-83')
+import re
+from decimal import Decimal, InvalidOperation
+from typing import Dict, Any
 
 class WalletError(Exception):
-    """Custom exception for wallet operation failures."""
+    """Base exception for wallet operations."""
     pass
 
-def validate_address(address: str) -> bool:
-    """Check if address length and prefix are valid."""
-    if not isinstance(address, str) or len(address) < 26:
-        return False
-    return address.startswith('0x') or address.startswith('bc1')
+class InvalidAddressError(WalletError):
+    """Raised when a crypto wallet address format is invalid."""
+    pass
 
-def process_transaction(recipient: str, amount: float) -> Optional[str]:
-    """
-    Execute transaction with validation and error handling.
-    Returns transaction hash or None on failure.
-    """
-    try:
-        if amount <= 0:
-            raise ValueError("Amount must be positive")
+class InsufficientBalanceError(WalletError):
+    """Raised when balance is inadequate for amount plus fee."""
+    pass
+
+def validate_and_process_transfer(
+    sender: str,
+    recipient: str,
+    amount_str: str,
+    balance_str: str,
+    fee_str: str = "0.0005"
+) -> Dict[str, Any]:
+    """Validates transfer parameters and calculates balances with edge case handling."""
+    address_regex = r"^0x[a-fA-F0-9]{40}$"
+    
+    if not isinstance(sender, str) or not re.match(address_regex, sender):
+        raise InvalidAddressError(f"Invalid sender hex address format: {sender}")
         
-        if not validate_address(recipient):
-            raise WalletError(f"Invalid address format: {recipient}")
+    if not isinstance(recipient, str) or not re.match(address_regex, recipient):
+        raise InvalidAddressError(f"Invalid recipient hex address format: {recipient}")
 
-        logger.info(f"Processing {amount} to {recipient}")
-        # Simulation of transaction hash generation
-        tx_hash = "tx_" + recipient[:8]
-        return tx_hash
+    if sender.lower() == recipient.lower():
+        raise WalletError("Self-transfer to identical address is not allowed.")
 
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        return None
-    except WalletError as e:
-        logger.error(f"Wallet operation error: {e}")
-        return None
-    except Exception as e:
-        logger.critical(f"Unexpected system failure: {e}")
-        return None
+    try:
+        amount = Decimal(amount_str)
+        balance = Decimal(balance_str)
+        fee = Decimal(fee_str)
+    except (InvalidOperation, TypeError) as err:
+        raise WalletError(f"Malformed numerical input: {err}") from err
+
+    if amount <= Decimal("0"):
+        raise WalletError(f"Transfer amount must be strictly positive, got: {amount}")
+
+    if fee < Decimal("0"):
+        raise WalletError("Transaction fee cannot be negative.")
+
+    total_deduction = amount + fee
+    if balance < total_deduction:
+        raise InsufficientBalanceError(
+            f"Insufficient funds. Required: {total_deduction}, Available: {balance}"
+        )
+
+    remaining_balance = balance - total_deduction
+    return {
+        "status": "success",
+        "sender": sender.lower(),
+        "recipient": recipient.lower(),
+        "amount": str(amount),
+        "fee": str(fee),
+        "remaining_balance": str(remaining_balance)
+    }
