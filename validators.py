@@ -1,37 +1,68 @@
+from decimal import Decimal, DecimalException, InvalidOperation
 import re
 from typing import Optional
 
+ETH_ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+BTC_ADDRESS_REGEX = re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$")
+HEX_32BYTES_REGEX = re.compile(r"^0x[a-fA-F0-9]{64}$")
 
-def is_valid_eth_address(address: str) -> bool:
-    """Validate EVM/Ethereum wallet address format."""
-    if not isinstance(address, str):
+
+def validate_wallet_address(address: str, chain: str = "ETH") -> bool:
+    """Validate cryptocurrency address formats with strict type and edge case checks."""
+    if not isinstance(address, str) or not address.strip():
         return False
-    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
 
+    clean_addr = address.strip()
 
-def is_valid_btc_address(address: str) -> bool:
-    """Validate basic Legacy, P2SH, or Bech32 Bitcoin address format."""
-    if not isinstance(address, str):
+    # Check for invalid control characters or null bytes in input
+    if "\x00" in clean_addr or any(ord(c) < 32 for c in clean_addr):
         return False
-    btc_pattern = r"^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-0-9ac-hj-np-z]{8,87})$"
-    return bool(re.match(btc_pattern, address))
+
+    chain_upper = chain.upper()
+    if chain_upper == "ETH":
+        return bool(ETH_ADDRESS_REGEX.match(clean_addr))
+    elif chain_upper == "BTC":
+        return bool(BTC_ADDRESS_REGEX.match(clean_addr))
+
+    return False
 
 
-def is_valid_tx_hash(tx_hash: str) -> bool:
-    """Check if a string matches standard 32-byte hex transaction hash format."""
+def safe_parse_amount(raw_amount: str, decimals: int = 18) -> Optional[Decimal]:
+    """Safely parse human-readable token amounts into Decimal with edge-case handling."""
+    if not isinstance(raw_amount, (str, int, float)) or isinstance(raw_amount, bool):
+        return None
+
+    if isinstance(decimals, bool) or not isinstance(decimals, int) or decimals < 0 or decimals > 36:
+        return None
+
+    try:
+        val_str = str(raw_amount).strip()
+        if not val_str or val_str.lower() in ("nan", "inf", "-inf", "infinity", "-infinity"):
+            return None
+
+        amount = Decimal(val_str)
+
+        # Prevent negative, infinite, or NaN values
+        if amount < 0 or amount.is_infinite() or amount.is_nan():
+            return None
+
+        # Verify precision does not exceed specified decimal ceiling
+        exponent = abs(amount.as_tuple().exponent)
+        if isinstance(exponent, int) and exponent > decimals:
+            return None
+
+        return amount
+    except (InvalidOperation, DecimalException, TypeError, ValueError):
+        return None
+
+
+def validate_tx_hash(tx_hash: str) -> bool:
+    """Check if transaction hash complies with standard 32-byte hex format."""
     if not isinstance(tx_hash, str):
         return False
-    pattern = r"^(0x)?[a-fA-F0-9]{64}$"
-    return bool(re.match(pattern, tx_hash))
 
+    clean_hash = tx_hash.strip()
+    if not clean_hash.startswith("0x") and len(clean_hash) == 64:
+        clean_hash = "0x" + clean_hash
 
-def sanitize_address(address: str) -> Optional[str]:
-    """Strip whitespaces and return normalized lower-case address if valid."""
-    if not address or not isinstance(address, str):
-        return None
-    cleaned = address.strip()
-    if is_valid_eth_address(cleaned):
-        return cleaned.lower()
-    if is_valid_btc_address(cleaned):
-        return cleaned
-    return None
+    return bool(HEX_32BYTES_REGEX.match(clean_hash))
