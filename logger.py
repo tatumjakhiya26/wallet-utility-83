@@ -1,31 +1,33 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-class WalletLogger:
-    """Standardized logging utility for crypto operations."""
+def setup_logger(name: str, log_file: str = 'wallet.log') -> logging.Logger:
+    """Initializes a rotating file logger for wallet operations."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
 
-    def __init__(self, name: str = 'wallet-utility-83') -> None:
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Prevent duplicate handlers if logger is re-initialized
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
+        # Rotate files at 5MB, keep 3 backups
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=3
+        )
         handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        logger.addHandler(handler)
 
-    def log_error(self, message: str, exc: Optional[Exception] = None) -> None:
-        """Graceful handling of operational exceptions."""
-        if exc:
-            error_detail = f"{message}: {type(exc).__name__} - {str(exc)}"
-            self.logger.error(error_detail)
-        else:
-            self.logger.error(message)
+        # Stream logs to console as well
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    def log_event(self, event: str, metadata: dict) -> None:
-        """Sanitized logging of transaction metadata."""
-        try:
-            self.logger.info(f"EVENT: {event} | DATA: {str(metadata)}")
-        except (ValueError, TypeError) as e:
-            self.log_error("serialization failure during logging", e)
+    return logger
 
-logger = WalletLogger()
+# Global instance for wallet-utility-83 components
+wallet_logger = setup_logger('wallet-utility-83')
