@@ -1,36 +1,38 @@
-import logging
+import re
 
-logger = logging.getLogger(__name__)
+# crypto address validation patterns
+ADDRESS_PATTERN = re.compile(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$')
 
-class TransactionError(Exception):
-    """Base exception for transaction processing"""
-    pass
+def validate_input(data: dict) -> bool:
+    """Ensures wallet operations receive valid data types and formats."""
+    address = data.get('address', '')
+    amount = data.get('amount', 0)
 
-def process_transaction(wallet_address: str, amount: float) -> dict:
-    """Validates and processes crypto transaction with robust error handling"""
-    try:
-        if not isinstance(amount, (int, float)) or amount <= 0:
-            raise ValueError("Invalid transaction amount: must be positive numeric")
-        
-        if len(wallet_address) != 42 or not wallet_address.startswith('0x'):
-            raise ValueError("Invalid wallet address format")
+    if not isinstance(address, str) or not ADDRESS_PATTERN.match(address):
+        return False
+    
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        return False
 
-        # Simulated processing logic
-        status = {"status": "success", "address": wallet_address, "amount": amount}
-        logger.info(f"Processed {amount} for {wallet_address}")
-        return status
+    return True
 
-    except ValueError as ve:
-        logger.error(f"Validation failure: {ve}")
-        return {"status": "failed", "error": str(ve)}
-    except Exception as e:
-        logger.critical(f"Unexpected system error: {e}")
-        return {"status": "error", "error": "internal system failure"}
+def process_wallet_queue(queue: list):
+    """Main processing loop for wallet transaction tasks."""
+    for task in queue:
+        try:
+            if not validate_input(task):
+                print(f"Skipping invalid task: {task}")
+                continue
+            
+            # proceed with signing and broadcast logic
+            print(f"Processing transaction to {task['address']} for {task['amount']} BTC")
+            
+        except Exception as e:
+            print(f"Critical failure processing task: {e}")
 
-def batch_process(transactions: list) -> list:
-    """Handles batch processing with individual item error isolation"""
-    results = []
-    for tx in transactions:
-        res = process_transaction(tx.get('addr', ''), tx.get('amt', 0))
-        results.append(res)
-    return results
+if __name__ == '__main__':
+    sample_tasks = [
+        {'address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', 'amount': 0.05},
+        {'address': 'invalid-address', 'amount': 1.0}
+    ]
+    process_wallet_queue(sample_tasks)
