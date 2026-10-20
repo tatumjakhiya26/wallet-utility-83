@@ -1,47 +1,51 @@
 # wallet-utility-83
 
-`wallet-utility-83` is a lightweight Python toolkit designed for secure address generation and balance auditing across EVM-compatible chains. It streamlines multi-wallet management by providing a programmatic interface for interacting with public ledger data.
+`wallet-utility-83` is a high-performance Python toolkit designed for secure management and bulk processing of cryptocurrency wallets. It provides developers with a streamlined interface to automate address generation, balance reconciliation, and transactional logging across EVM-compatible chains.
 
-## Features
+### Key Features
 
-*   **Multi-Chain Support:** Native integration for Ethereum, Polygon, and BSC balance lookups via JSON-RPC providers.
-*   **Hierarchical Deterministic (HD) Generation:** Secure derivation of mnemonic phrases and private keys using BIP-39 standards.
-*   **Automated Auditing:** Batch scanning functionality to identify active balances across hundreds of addresses in seconds.
-*   **Encrypted Storage:** Built-in utility to export wallet metadata into AES-256 encrypted JSON files.
+*   **BIP-39 Implementation:** Generates hardened mnemonic phrases and derives HD wallet keys locally without exposing private information to third-party APIs.
+*   **Multi-Chain Balance Sync:** Asynchronously queries node providers to fetch real-time balances for ETH, BSC, and Polygon addresses simultaneously.
+*   **Transaction Guard:** Built-in validation suite to prevent accidental sends to blacklisted or non-checksummed addresses.
+*   **CSV Integration:** Effortless import/export functionality for bulk wallet auditing and archival tasks.
 
-## Installation
+### Installation
 
 Ensure you have Python 3.9+ installed. It is recommended to use a virtual environment.
 
 ```bash
+# Clone the repository
 git clone https://github.com/Developer/wallet-utility-83.git
 cd wallet-utility-83
-python -m venv venv
-source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Usage
+### Usage
 
-To generate a new wallet and check its balance on the Ethereum mainnet, use the following implementation:
+You can use the library to generate a new wallet and check its current balance with a simple script:
 
 ```python
 from wallet_utility import WalletManager
 
 # Initialize manager
-wm = WalletManager(provider_url="https://eth.llamarpc.com")
+wm = WalletManager(network='mainnet')
 
-# Generate new identity
-wallet = wm.create_wallet()
-print(f"Address: {wallet.address}")
+# Generate a new HD wallet
+new_wallet = wm.generate_wallet()
+print(f"Address: {new_wallet.address}")
 
-# Query balance
-balance = wm.get_balance(wallet.address)
+# Check balance
+balance = wm.get_balance(new_wallet.address)
 print(f"Current Balance: {balance} ETH")
 ```
 
-## License
+### License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### Security Warning
+*Always store your mnemonic phrases in a secure, offline environment. This tool performs local operations, but ensure your system is free of malware before managing high-value assets.*
