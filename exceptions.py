@@ -1,25 +1,35 @@
-class WalletError(Exception):
-    """Base exception for wallet-utility-83 operations."""
+class WalletBaseError(Exception):
+    """Base exception for all wallet operations."""
     pass
 
-class InsufficientBalanceError(WalletError):
-    """Raised when transaction amount exceeds available funds."""
+class TransactionExecutionError(WalletBaseError):
+    """Raised when transaction signing or broadcast fails."""
     pass
 
-class InvalidAddressError(WalletError):
-    """Raised when a crypto address format is invalid."""
+class InsufficientFundsError(WalletBaseError):
+    """Raised when account balance is too low."""
     pass
 
-class NetworkConnectionError(WalletError):
-    """Raised when the blockchain node is unreachable."""
+class RateLimitExceeded(WalletBaseError):
+    """Raised when API requests exceed threshold."""
+    def __init__(self, retry_after: int):
+        self.retry_after = retry_after
+        super().__init__(f"Rate limit exceeded. Retry in {retry_after}s.")
+
+class ValidationError(WalletBaseError):
+    """Raised when input validation fails."""
     pass
 
-class SecurityAlertError(WalletError):
-    """Raised for suspicious activity or auth failures."""
-    pass
+def handle_wallet_exception(e: Exception) -> dict:
+    """Standardizes exception output for logs and UI."""
+    if isinstance(e, RateLimitExceeded):
+        return {"error": "rate_limited", "retry_after": e.retry_after}
+    
+    return {"error": "internal_failure", "message": str(e)}
 
-def handle_wallet_exception(e: Exception) -> str:
-    """Format wallet exceptions for logging and user display."""
-    if isinstance(e, WalletError):
-        return f"[Wallet Error]: {str(e)}"
-    return f"[Unexpected Error]: {type(e).__name__} - {str(e)}"
+# Custom exception groups for parallel process batching
+class BatchProcessingError(WalletBaseError):
+    """Collection of errors during multi-transaction execution."""
+    def __init__(self, errors: list):
+        self.errors = errors
+        super().__init__(f"Batch processing failed with {len(errors)} errors")
