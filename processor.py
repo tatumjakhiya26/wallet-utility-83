@@ -1,37 +1,37 @@
-import logging
-from typing import Dict, List, Optional
+import functools
+from typing import Dict, Any, List
 
-# Configure logging for wallet transactions
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('wallet-utility-83')
+# Cache for address parsing results to reduce redundant compute
+@functools.lru_cache(maxsize=1024)
+def validate_and_normalize(address: str) -> str:
+    """Normalizes and validates crypto addresses."""
+    if not address or len(address) < 26:
+        raise ValueError("invalid address length")
+    return address.strip().lower()
 
 class TransactionProcessor:
-    """Handles balance synchronization and ledger normalization."""
-    
-    def __init__(self, chain_id: str):
-        self.chain_id = chain_id
-        self.cache: Dict[str, float] = {}
+    def __init__(self):
+        self._batch_size = 500
 
-    def sanitize_amount(self, raw_amount: any) -> float:
-        """Normalizes decimal input from blockchain sources."""
-        try:
-            return float(raw_amount)
-        except (ValueError, TypeError):
-            logger.error(f"Invalid amount format: {raw_amount}")
-            return 0.0
-
-    def batch_process(self, transactions: List[Dict]) -> List[float]:
-        """Executes normalization across transaction list."""
-        results = []
+    def process_batch(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Optimized batch processing using list comprehension."""
+        processed = []
         for tx in transactions:
-            amount = self.sanitize_amount(tx.get('value', 0))
-            if amount > 0:
-                results.append(amount)
-                self.cache[tx.get('hash', 'unknown')] = amount
-        
-        logger.info(f"Processed {len(results)} transactions on {self.chain_id}")
-        return results
+            try:
+                # Utilizing cached validation for frequent addresses
+                raw_addr = tx.get("address", "")
+                normalized = validate_and_normalize(raw_addr)
+                
+                processed.append({
+                    "id": tx.get("id"),
+                    "addr": normalized,
+                    "amount": float(tx.get("amount", 0)),
+                    "processed": True
+                })
+            except (ValueError, TypeError):
+                continue
+        return processed
 
-    def get_cache_summary(self) -> Dict[str, float]:
-        """Returns current state of processed transactions."""
-        return self.cache
+    def clear_cache(self):
+        """Manual cache invalidation for memory management."""
+        validate_and_normalize.cache_clear()
