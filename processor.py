@@ -1,37 +1,38 @@
-import functools
-from typing import Dict, Any, List
+import re
 
-# Cache for address parsing results to reduce redundant compute
-@functools.lru_cache(maxsize=1024)
-def validate_and_normalize(address: str) -> str:
-    """Normalizes and validates crypto addresses."""
-    if not address or len(address) < 26:
-        raise ValueError("invalid address length")
-    return address.strip().lower()
+# Validation patterns for crypto wallet operations
+ADDRESS_PATTERN = re.compile(r'^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$')
 
-class TransactionProcessor:
-    def __init__(self):
-        self._batch_size = 500
+def validate_input(address: str, amount: float) -> bool:
+    """Validates address format and positive transaction amounts."""
+    if not ADDRESS_PATTERN.match(address):
+        return False
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        return False
+    return True
 
-    def process_batch(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Optimized batch processing using list comprehension."""
-        processed = []
-        for tx in transactions:
-            try:
-                # Utilizing cached validation for frequent addresses
-                raw_addr = tx.get("address", "")
-                normalized = validate_and_normalize(raw_addr)
-                
-                processed.append({
-                    "id": tx.get("id"),
-                    "addr": normalized,
-                    "amount": float(tx.get("amount", 0)),
-                    "processed": True
-                })
-            except (ValueError, TypeError):
-                continue
-        return processed
+def process_transactions(queue: list):
+    """Main processing loop for wallet transactions with input sanitization."""
+    for entry in queue:
+        address = entry.get('address')
+        amount = entry.get('amount')
+        
+        if not validate_input(address, amount):
+            print(f"Skipping invalid transaction: {address}")
+            continue
+        
+        try:
+            execute_transfer(address, amount)
+        except Exception as e:
+            print(f"Transaction failed for {address}: {e}")
 
-    def clear_cache(self):
-        """Manual cache invalidation for memory management."""
-        validate_and_normalize.cache_clear()
+def execute_transfer(address: str, amount: float):
+    """Internal handler for blockchain node interaction."""
+    print(f"Executing transfer of {amount} to {address}")
+
+if __name__ == '__main__':
+    mock_queue = [
+        {'address': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'amount': 1.5},
+        {'address': 'invalid_address', 'amount': 0.1}
+    ]
+    process_transactions(mock_queue)
