@@ -1,27 +1,25 @@
-from typing import Union, Optional
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Union
 
-def format_address(address: str) -> str:
-    """Shorten crypto address for display."""
-    if len(address) < 10:
-        return address
-    return f"{address[:6]}...{address[-4:]}"
+def format_crypto_amount(amount: Union[str, float, Decimal], decimals: int = 8) -> Decimal:
+    """Normalizes crypto amounts to a fixed precision decimal."""
+    val = Decimal(str(amount))
+    return val.quantize(Decimal(f"1.{'0' * decimals}"), rounding=ROUND_HALF_UP)
 
-def to_wei(amount: Union[int, float], decimals: int = 18) -> int:
-    """Convert human-readable currency to wei units."""
-    return int(amount * (10 ** decimals))
+def calculate_fee(amount: str, fee_rate: float) -> Decimal:
+    """Calculates network transaction fee based on rate."""
+    amount_dec = Decimal(amount)
+    fee = amount_dec * Decimal(str(fee_rate))
+    return fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
 
-def validate_transaction_hash(tx_hash: str) -> bool:
-    """Verify basic hexadecimal transaction hash format."""
-    if not tx_hash.startswith("0x"):
-        return False
-    return len(tx_hash) == 66 and all(c in "0123456789abcdefABCDEF" for c in tx_hash[2:])
-
-def calculate_fee(gas_price: int, gas_limit: int) -> int:
-    """Calculate total transaction cost in wei."""
-    return gas_price * gas_limit
-
-def sanitize_input(value: Optional[str]) -> str:
-    """Normalize string input for crypto operations."""
-    if value is None:
-        return ""
-    return value.strip().lower()
+def validate_address_length(address: str, chain: str) -> bool:
+    """Basic length check for common crypto addresses."""
+    length_map = {
+        'BTC': 34,
+        'ETH': 42,
+        'SOL': 44
+    }
+    expected = length_map.get(chain.upper())
+    if not expected:
+        return True
+    return len(address) == expected
