@@ -1,33 +1,47 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import re
+import sys
+from typing import Optional
 
-def setup_logger(name: str = "wallet-utility-83") -> logging.Logger:
-    """Configures a rotating file logger for crypto operations."""
+# Sensitive patterns to mask in crypto logs (private keys, mnemonics)
+SENSITIVE_PATTERNS = [
+    (r"(0x)?[a-fA-F0-9]{64}", "[MASKED_PRIVATE_KEY]"),
+    (r"\b(?:[a-z]+\s+){11}[a-z]+\b", "[MASKED_MNEMONIC]"),
+]
+
+
+class CryptoSanitizingFormatter(logging.Formatter):
+    """Log formatter that masks sensitive crypto data like private keys and seed phrases."""
+
+    def __init__(self, fmt: Optional[str] = None, datefmt: Optional[str] = None):
+        super().__init__(fmt, datefmt)
+
+    def format(self, record: logging.LogRecord) -> str:
+        original_msg = super().format(record)
+        sanitized_msg = original_msg
+
+        for pattern, replacement in SENSITIVE_PATTERNS:
+            sanitized_msg = re.sub(pattern, replacement, sanitized_msg)
+
+        return sanitized_msg
+
+
+def setup_logger(
+    name: str = "wallet_utility", level: int = logging.INFO
+) -> logging.Logger:
+    """Configures and returns a sanitized logger for wallet operations."""
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    if not os.path.exists("logs"):
-        os.makedirs("logs")
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    # 5MB rotation, keep 3 backup files
-    handler = RotatingFileHandler(
-        "logs/wallet.log", 
-        maxBytes=5 * 1024 * 1024, 
-        backupCount=3
-    )
-    handler.setFormatter(formatter)
+    logger.setLevel(level)
 
     if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        fmt = "%(asctime)s - [%(levelname)s] - %(name)s - %(message)s"
+        formatter = CryptoSanitizingFormatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S")
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
-    # Add console output for development
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
 
     return logger
+
+
+# Default logger instance for direct module imports
+default_logger = setup_logger()
