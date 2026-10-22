@@ -1,47 +1,59 @@
+import os
 import logging
-import re
-import sys
+from logging.handlers import RotatingFileHandler
 from typing import Optional
 
-# Sensitive patterns to mask in crypto logs (private keys, mnemonics)
-SENSITIVE_PATTERNS = [
-    (r"(0x)?[a-fA-F0-9]{64}", "[MASKED_PRIVATE_KEY]"),
-    (r"\b(?:[a-z]+\s+){11}[a-z]+\b", "[MASKED_MNEMONIC]"),
-]
-
-
-class CryptoSanitizingFormatter(logging.Formatter):
-    """Log formatter that masks sensitive crypto data like private keys and seed phrases."""
-
-    def __init__(self, fmt: Optional[str] = None, datefmt: Optional[str] = None):
-        super().__init__(fmt, datefmt)
-
-    def format(self, record: logging.LogRecord) -> str:
-        original_msg = super().format(record)
-        sanitized_msg = original_msg
-
-        for pattern, replacement in SENSITIVE_PATTERNS:
-            sanitized_msg = re.sub(pattern, replacement, sanitized_msg)
-
-        return sanitized_msg
+DEFAULT_LOG_FILE = "wallet_utility.log"
+DEFAULT_LOG_LEVEL = logging.INFO
+MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+BACKUP_COUNT = 5
 
 
 def setup_logger(
-    name: str = "wallet_utility", level: int = logging.INFO
+    name: str = "wallet_utility",
+    log_file: Optional[str] = DEFAULT_LOG_FILE,
+    level: int = DEFAULT_LOG_LEVEL,
+    max_bytes: int = MAX_BYTES,
+    backup_count: int = BACKUP_COUNT,
 ) -> logging.Logger:
-    """Configures and returns a sanitized logger for wallet operations."""
+    """Configures and returns a logger instance with console and rotating file handlers."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        fmt = "%(asctime)s - [%(levelname)s] - %(name)s - %(message)s"
-        formatter = CryptoSanitizingFormatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    # Prevent duplicate handlers if re-initialized
+    if logger.handlers:
+        return logger
+
+    # Log formatting for wallet operations
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # Console output handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
+    logger.addHandler(console_handler)
+
+    # Rotating file handler for persistent logs
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+
+        file_handler = RotatingFileHandler(
+            filename=log_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(level)
+        logger.addHandler(file_handler)
 
     return logger
 
 
-# Default logger instance for direct module imports
-default_logger = setup_logger()
+# Initialize primary application logger
+wallet_logger = setup_logger()
