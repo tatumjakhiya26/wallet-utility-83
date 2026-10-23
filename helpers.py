@@ -1,25 +1,37 @@
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Union
+import functools
+import random
+import time
+from typing import Any, Callable, Tuple, Type
 
-def format_crypto_amount(amount: Union[str, float, Decimal], decimals: int = 8) -> Decimal:
-    """Normalizes crypto amounts to a fixed precision decimal."""
-    val = Decimal(str(amount))
-    return val.quantize(Decimal(f"1.{'0' * decimals}"), rounding=ROUND_HALF_UP)
 
-def calculate_fee(amount: str, fee_rate: float) -> Decimal:
-    """Calculates network transaction fee based on rate."""
-    amount_dec = Decimal(amount)
-    fee = amount_dec * Decimal(str(fee_rate))
-    return fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
-
-def validate_address_length(address: str, chain: str) -> bool:
-    """Basic length check for common crypto addresses."""
-    length_map = {
-        'BTC': 34,
-        'ETH': 42,
-        'SOL': 44
-    }
-    expected = length_map.get(chain.upper())
-    if not expected:
-        return True
-    return len(address) == expected
+def retry_network_op(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True,
+    retry_exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+) -> Callable:
+    """Decorator to retry network operations with exponential backoff and jitter.
+    
+    Useful for handling transient RPC node errors and rate limits in crypto applications.
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except retry_exceptions as err:
+                    if attempt == max_retries:
+                        raise err
+                    
+                    sleep_time = delay
+                    if jitter:
+                        sleep_time += random.uniform(0, 0.5 * delay)
+                    
+                    time.sleep(sleep_time)
+                    delay *= backoff_factor
+            return None
+        return wrapper
+    return decorator
