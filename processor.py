@@ -1,38 +1,29 @@
-import re
+import decimal
+from typing import Dict, Optional
 
-# Validation patterns for crypto wallet operations
-ADDRESS_PATTERN = re.compile(r'^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$')
+# Configuration for precision handling in wallet operations
+SATOSHI_UNIT = decimal.Decimal('100000000')
 
-def validate_input(address: str, amount: float) -> bool:
-    """Validates address format and positive transaction amounts."""
-    if not ADDRESS_PATTERN.match(address):
-        return False
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        return False
-    return True
+def normalize_amount(amount: str) -> decimal.Decimal:
+    """Converts raw string amount to decimal with standard crypto precision."""
+    try:
+        return decimal.Decimal(amount).quantize(decimal.Decimal('0.00000001'), rounding=decimal.ROUND_HALF_UP)
+    except decimal.InvalidOperation:
+        return decimal.Decimal('0.00000000')
 
-def process_transactions(queue: list):
-    """Main processing loop for wallet transactions with input sanitization."""
-    for entry in queue:
-        address = entry.get('address')
-        amount = entry.get('amount')
-        
-        if not validate_input(address, amount):
-            print(f"Skipping invalid transaction: {address}")
-            continue
-        
-        try:
-            execute_transfer(address, amount)
-        except Exception as e:
-            print(f"Transaction failed for {address}: {e}")
+def calculate_fee(amount_sats: int, fee_rate: float) -> int:
+    """Calculates network transaction fee based on current rate."""
+    return int(amount_sats * fee_rate)
 
-def execute_transfer(address: str, amount: float):
-    """Internal handler for blockchain node interaction."""
-    print(f"Executing transfer of {amount} to {address}")
+def format_wallet_balance(balance_data: Dict[str, str]) -> Dict[str, float]:
+    """Converts dictionary of raw amounts to float representation for UI."""
+    processed = {}
+    for currency, value in balance_data.items():
+        decimal_val = normalize_amount(value)
+        processed[currency] = float(decimal_val)
+    return processed
 
 if __name__ == '__main__':
-    mock_queue = [
-        {'address': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'amount': 1.5},
-        {'address': 'invalid_address', 'amount': 0.1}
-    ]
-    process_transactions(mock_queue)
+    # Example usage for wallet-utility-83 core logic
+    raw_balances = {"BTC": "0.00543210", "ETH": "1.23456789"}
+    print(format_wallet_balance(raw_balances))
