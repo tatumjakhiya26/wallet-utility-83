@@ -1,37 +1,47 @@
-import re
-from typing import Dict, Any
+"""Crypto data normalization and formatting handler for wallet payloads."""
 
-def validate_address(address: str) -> bool:
-    # Matches standard hex-encoded crypto addresses
-    pattern = r'^0x[a-fA-F0-9]{40}$'
-    return bool(re.match(pattern, address))
+from typing import Dict, Any, Union
 
-def process_transaction(data: Dict[str, Any]) -> None:
+
+def wei_to_ether(wei_value: Union[int, str]) -> float:
+    """Convert Wei (int or hex string) to Ether float value."""
+    if isinstance(wei_value, str):
+        if wei_value.startswith("0x"):
+            wei_value = int(wei_value, 16)
+        else:
+            wei_value = int(wei_value)
+    return wei_value / 10**18
+
+
+def satoshi_to_btc(satoshi_value: Union[int, str]) -> float:
+    """Convert Satoshi value to BTC float value."""
+    return int(satoshi_value) / 10**8
+
+
+def normalize_transaction(tx_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main processing loop for incoming crypto wallet requests.
-    Ensures input integrity before blockchain execution.
+    Extract and format key transaction details from raw wallet API responses.
+    Handles both EVM hex values and standard integer amounts.
     """
-    required_fields = ['address', 'amount']
-    
-    for field in required_fields:
-        if field not in data:
-            raise ValueError(f'Missing required field: {field}')
+    tx_hash = tx_data.get("hash") or tx_data.get("txid", "")
+    sender = tx_data.get("from") or tx_data.get("sender", "")
+    recipient = tx_data.get("to") or tx_data.get("recipient", "")
+    raw_value = tx_data.get("value", 0)
 
-    address = data['address']
-    amount = data['amount']
+    if isinstance(raw_value, str) and raw_value.startswith("0x"):
+        amount_wei = int(raw_value, 16)
+    else:
+        amount_wei = int(raw_value)
 
-    if not validate_address(address):
-        raise ValueError(f'Invalid blockchain address format: {address}')
+    amount_eth = wei_to_ether(amount_wei)
+    confirmations = tx_data.get("confirmations", 0)
 
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        raise ValueError('Amount must be a positive numeric value')
-
-    # Proceed with transaction logic
-    print(f'Processing transfer of {amount} to {address}')
-
-if __name__ == '__main__':
-    sample_payload = {'address': '0x1234567890123456789012345678901234567890', 'amount': 1.5}
-    try:
-        process_transaction(sample_payload)
-    except ValueError as e:
-        print(f'Validation failed: {e}')
+    return {
+        "tx_hash": str(tx_hash).lower(),
+        "sender": str(sender).lower(),
+        "recipient": str(recipient).lower(),
+        "amount_wei": amount_wei,
+        "amount_eth": round(amount_eth, 6),
+        "block_number": tx_data.get("blockNumber") or tx_data.get("block_height"),
+        "status": "confirmed" if confirmations > 0 else "pending",
+    }
