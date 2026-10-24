@@ -1,30 +1,32 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from pathlib import Path
 
-def setup_logger(name: str, log_file: str = 'wallet-utility.log') -> logging.Logger:
-    """Configures a rotating file logger for crypto operations."""
+def setup_logger(name: str, log_file: str = "wallet.log") -> logging.Logger:
+    """Configures a standard logger for crypto wallet operations."""
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if function called multiple times
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
-        # Rotate logs after 5MB, keep 3 backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    # Console handler for real-time visibility
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-        # Optional console output for development
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        logger.addHandler(console)
+    # File handler for persistent transaction history
+    log_path = Path(log_file)
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
     return logger
+
+def log_transaction(logger: logging.Logger, tx_id: str, status: str, amount: float):
+    """Utility to log specific wallet transaction events."""
+    logger.info(f"Tx: {tx_id} | Status: {status} | Amount: {amount}")
+
+# Global application logger
+wallet_logger = setup_logger("wallet-utility-83")
