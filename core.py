@@ -1,63 +1,26 @@
-import re
-from decimal import Decimal, InvalidOperation
-from typing import Dict, Any
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
 
-class WalletError(Exception):
-    """Base exception for wallet operations."""
-    pass
-
-class InvalidAddressError(WalletError):
-    """Raised when a crypto wallet address format is invalid."""
-    pass
-
-class InsufficientBalanceError(WalletError):
-    """Raised when balance is inadequate for amount plus fee."""
-    pass
-
-def validate_and_process_transfer(
-    sender: str,
-    recipient: str,
-    amount_str: str,
-    balance_str: str,
-    fee_str: str = "0.0005"
-) -> Dict[str, Any]:
-    """Validates transfer parameters and calculates balances with edge case handling."""
-    address_regex = r"^0x[a-fA-F0-9]{40}$"
-    
-    if not isinstance(sender, str) or not re.match(address_regex, sender):
-        raise InvalidAddressError(f"Invalid sender hex address format: {sender}")
-        
-    if not isinstance(recipient, str) or not re.match(address_regex, recipient):
-        raise InvalidAddressError(f"Invalid recipient hex address format: {recipient}")
-
-    if sender.lower() == recipient.lower():
-        raise WalletError("Self-transfer to identical address is not allowed.")
-
+def format_crypto_amount(amount: str, decimals: int = 8) -> str:
+    """Standardizes crypto values to specified precision."""
     try:
-        amount = Decimal(amount_str)
-        balance = Decimal(balance_str)
-        fee = Decimal(fee_str)
-    except (InvalidOperation, TypeError) as err:
-        raise WalletError(f"Malformed numerical input: {err}") from err
+        value = Decimal(amount)
+        quantizer = Decimal('1.' + '0' * decimals)
+        return str(value.quantize(quantizer, rounding=ROUND_HALF_UP))
+    except (ValueError, TypeError):
+        return "0.00000000"
 
-    if amount <= Decimal("0"):
-        raise WalletError(f"Transfer amount must be strictly positive, got: {amount}")
-
-    if fee < Decimal("0"):
-        raise WalletError("Transaction fee cannot be negative.")
-
-    total_deduction = amount + fee
-    if balance < total_deduction:
-        raise InsufficientBalanceError(
-            f"Insufficient funds. Required: {total_deduction}, Available: {balance}"
-        )
-
-    remaining_balance = balance - total_deduction
-    return {
-        "status": "success",
-        "sender": sender.lower(),
-        "recipient": recipient.lower(),
-        "amount": str(amount),
-        "fee": str(fee),
-        "remaining_balance": str(remaining_balance)
+def validate_address(address: str, chain: str) -> bool:
+    """Basic length and prefix validation for wallets."""
+    rules = {
+        "btc": (lambda a: len(a) in [26, 34, 42, 62] and a.isalnum()),
+        "eth": (lambda a: len(a) == 42 and a.startswith("0x"))
     }
+    validator = rules.get(chain.lower())
+    return validator(address) if validator else False
+
+def calculate_fee(amount: str, rate: float) -> str:
+    """Transaction fee calculation based on network rate."""
+    amount_dec = Decimal(amount)
+    fee = amount_dec * Decimal(str(rate))
+    return str(fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP))
