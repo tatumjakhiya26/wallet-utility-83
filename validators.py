@@ -1,35 +1,36 @@
 import re
 
-class WalletValidationError(Exception):
-    """Custom exception for crypto address validation issues."""
-    pass
+# crypto-specific address patterns
+ETH_PATTERN = re.compile(r'^0x[a-fA-F0-9]{40}$')
+BTC_PATTERN = re.compile(r'^(1|3|bc1)[a-zA-Z0-9]{25,39}$')
 
-def validate_address(address: str, chain_type: str = "eth") -> bool:
-    """
-    Validates crypto addresses based on network patterns.
-    Returns True if valid, otherwise raises WalletValidationError.
-    """
-    patterns = {
-        "eth": r"^0x[a-fA-F0-9]{40}$",
-        "btc": r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
-    }
-
-    if chain_type not in patterns:
-        raise WalletValidationError(f"Unsupported chain type: {chain_type}")
-
-    if not re.match(patterns[chain_type], address):
-        raise WalletValidationError(f"Invalid {chain_type} address format")
-
-    return True
+def validate_wallet_address(address: str, chain: str) -> bool:
+    """verify address format based on network type."""
+    if not isinstance(address, str):
+        return False
+    
+    if chain.lower() == 'eth':
+        return bool(ETH_PATTERN.match(address))
+    if chain.lower() == 'btc':
+        return bool(BTC_PATTERN.match(address))
+    
+    return False
 
 def validate_amount(amount: float) -> bool:
-    """
-    Ensures the transaction amount is positive and within logical bounds.
-    """
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        raise WalletValidationError("Transaction amount must be a positive number")
-    
-    if amount > 1_000_000:
-        raise WalletValidationError("Transaction amount exceeds single transfer limit")
+    """ensure transaction amount is positive and numeric."""
+    try:
+        val = float(amount)
+        return val > 0
+    except (ValueError, TypeError):
+        return False
 
-    return True
+def process_transaction_input(data: dict) -> bool:
+    """main entry point for input validation routines."""
+    required_fields = ['address', 'amount', 'chain']
+    if not all(field in data for field in required_fields):
+        return False
+        
+    return (
+        validate_wallet_address(data['address'], data['chain'])
+        and validate_amount(data['amount'])
+    )
