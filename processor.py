@@ -1,29 +1,43 @@
-import decimal
-from typing import Dict, Optional
+import re
 
-# Configuration for precision handling in wallet operations
-SATOSHI_UNIT = decimal.Decimal('100000000')
+class WalletProcessor:
+    """Handles validation and processing for crypto transactions."""
+    
+    def __init__(self):
+        self.address_pattern = re.compile(r'^(0x)?[0-9a-fA-F]{40}$')
 
-def normalize_amount(amount: str) -> decimal.Decimal:
-    """Converts raw string amount to decimal with standard crypto precision."""
-    try:
-        return decimal.Decimal(amount).quantize(decimal.Decimal('0.00000001'), rounding=decimal.ROUND_HALF_UP)
-    except decimal.InvalidOperation:
-        return decimal.Decimal('0.00000000')
+    def validate_input(self, address: str, amount: float) -> bool:
+        """Check if address and amount meet security criteria."""
+        if not isinstance(address, str) or not self.address_pattern.match(address):
+            return False
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            return False
+        return True
 
-def calculate_fee(amount_sats: int, fee_rate: float) -> int:
-    """Calculates network transaction fee based on current rate."""
-    return int(amount_sats * fee_rate)
+    def run_main_loop(self, queue: list):
+        """Process transaction queue with input validation."""
+        for entry in queue:
+            addr = entry.get('address')
+            amt = entry.get('amount')
 
-def format_wallet_balance(balance_data: Dict[str, str]) -> Dict[str, float]:
-    """Converts dictionary of raw amounts to float representation for UI."""
-    processed = {}
-    for currency, value in balance_data.items():
-        decimal_val = normalize_amount(value)
-        processed[currency] = float(decimal_val)
-    return processed
+            if not self.validate_input(addr, amt):
+                print(f"Validation failed for entry: {entry}")
+                continue
+
+            try:
+                self._execute_transfer(addr, amt)
+            except Exception as e:
+                print(f"Transaction error: {e}")
+
+    def _execute_transfer(self, address: str, amount: float):
+        """Mock logic for blockchain transfer."""
+        print(f"Transferring {amount} to {address}...")
 
 if __name__ == '__main__':
-    # Example usage for wallet-utility-83 core logic
-    raw_balances = {"BTC": "0.00543210", "ETH": "1.23456789"}
-    print(format_wallet_balance(raw_balances))
+    processor = WalletProcessor()
+    transactions = [
+        {'address': '0x1234567890123456789012345678901234567890', 'amount': 1.5},
+        {'address': 'invalid-addr', 'amount': 10},
+        {'address': '0xABC1234567890123456789012345678901234567', 'amount': -5}
+    ]
+    processor.run_main_loop(transactions)
