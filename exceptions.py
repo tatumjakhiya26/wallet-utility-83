@@ -1,31 +1,23 @@
-from typing import Optional
-
 class WalletError(Exception):
-    """Base exception for all wallet-utility-83 errors."""
-    def __init__(self, message: str, code: Optional[int] = None) -> None:
-        super().__init__(message)
-        self.code = code
+    """Base exception class for wallet operations."""
+    pass
 
-class InsufficientFundsError(WalletError):
-    """Raised when the wallet balance is too low for the transaction."""
-    def __init__(self, balance: float, required: float) -> None:
-        message = f"Insufficient balance: have {balance}, need {required}"
-        super().__init__(message, code=1001)
+class InsufficientBalanceError(WalletError):
+    """Raised when transaction amount exceeds available funds."""
+    def __init__(self, requested: float, available: float):
+        super().__init__(f"Insufficient funds: requested {requested}, available {available}")
 
 class InvalidAddressError(WalletError):
-    """Raised when the provided cryptocurrency address is malformed."""
-    def __init__(self, address: str) -> None:
-        message = f"Invalid format for address: {address}"
-        super().__init__(message, code=1002)
+    """Raised when a crypto address format is invalid."""
+    def __init__(self, address: str, chain: str):
+        super().__init__(f"Invalid {chain} address format: {address}")
 
 class ConnectionTimeoutError(WalletError):
-    """Raised when the blockchain node fails to respond in time."""
-    def __init__(self, endpoint: str) -> None:
-        message = f"Timeout connecting to endpoint: {endpoint}"
-        super().__init__(message, code=1003)
+    """Raised when node communication fails."""
+    def __init__(self, node: str):
+        super().__init__(f"Connection to node {node} timed out")
 
-class SignatureError(WalletError):
-    """Raised when transaction signing fails due to bad keys."""
-    def __init__(self, reason: str) -> None:
-        message = f"Transaction signature failed: {reason}"
-        super().__init__(message, code=1004)
+class SigningError(WalletError):
+    """Raised during transaction signing process."""
+    def __init__(self, reason: str):
+        super().__init__(f"Transaction signing failed: {reason}")
