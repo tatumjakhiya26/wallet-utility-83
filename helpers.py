@@ -1,38 +1,46 @@
-import secrets
-from decimal import Decimal
-from typing import Union
+"""
+Crypto data conversion and balance formatting utilities.
+"""
 
-SATOSHI_PER_BTC = Decimal("100000000")
-WEI_PER_ETH = Decimal("1000000000000000000")
+from decimal import Decimal, ROUND_DOWN
+from typing import Union, Dict
 
-
-def satoshi_to_btc(satoshis: Union[int, Decimal]) -> Decimal:
-    """Convert Satoshi amount to Bitcoin Decimal value."""
-    return Decimal(str(satoshis)) / SATOSHI_PER_BTC
-
-
-def btc_to_satoshi(btc: Union[float, str, Decimal]) -> int:
-    """Convert Bitcoin amount to integer Satoshis."""
-    return int(Decimal(str(btc)) * SATOSHI_PER_BTC)
-
-
-def wei_to_eth(wei: Union[int, Decimal]) -> Decimal:
-    """Convert Wei amount to Ether Decimal value."""
-    return Decimal(str(wei)) / WEI_PER_ETH
+# Standard precision map for popular cryptocurrencies (decimals)
+TOKEN_DECIMALS: Dict[str, int] = {
+    "BTC": 8,
+    "ETH": 18,
+    "USDT": 6,
+    "USDC": 6,
+    "SOL": 9,
+    "BNB": 18,
+    "DOGE": 8,
+}
 
 
-def eth_to_wei(eth: Union[float, str, Decimal]) -> int:
-    """Convert Ether amount to integer Wei."""
-    return int(Decimal(str(eth)) * WEI_PER_ETH)
+def raw_to_decimal(amount: Union[int, str], symbol: str) -> Decimal:
+    """Convert raw smallest currency units (e.g., Satoshis, Wei) to Decimal."""
+    decimals = TOKEN_DECIMALS.get(symbol.upper(), 18)
+    factor = Decimal(10) ** decimals
+    return Decimal(str(amount)) / factor
 
 
-def format_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
-    """Format crypto address for display truncation (e.g. 0x1234...abcd)."""
-    if not address or len(address) <= (prefix_len + suffix_len):
-        return address
-    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
+def decimal_to_raw(amount: Union[float, str, Decimal], symbol: str) -> int:
+    """Convert base token units to smallest raw integer units."""
+    decimals = TOKEN_DECIMALS.get(symbol.upper(), 18)
+    factor = Decimal(10) ** decimals
+    converted = Decimal(str(amount)) * factor
+    return int(converted.quantize(Decimal("1"), rounding=ROUND_DOWN))
 
 
-def generate_hex_nonce(byte_length: int = 16) -> str:
-    """Generate a cryptographically secure random hex string."""
-    return secrets.token_hex(byte_length)
+def format_crypto_balance(
+    amount: Union[Decimal, float, str], precision: int = 4, symbol: str = ""
+) -> str:
+    """Format numeric balance with optional token symbol and fixed precision."""
+    dec_val = Decimal(str(amount))
+    quantizer = Decimal("10") ** -precision
+    formatted_val = dec_val.quantize(quantizer, rounding=ROUND_DOWN)
+
+    val_str = f"{formatted_val:f}"
+    if symbol:
+        return f"{val_str} {symbol.upper()}"
+    return val_str
