@@ -1,29 +1,61 @@
-from decimal import Decimal, InvalidOperation
-from typing import Optional
+import re
+from typing import Dict, Any, List, Tuple
 
-def normalize_amount(amount: str, precision: int = 8) -> Optional[Decimal]:
-    """Converts raw string input to a normalized Decimal for calculations."""
-    try:
-        value = Decimal(amount)
-        if value < 0:
-            return None
-        return value.quantize(Decimal('1.' + '0' * precision))
-    except (InvalidOperation, ValueError, TypeError):
-        return None
 
-def format_crypto_address(address: str) -> str:
-    """Sanitizes and formats blockchain address string."""
-    clean_address = address.strip().lower()
-    if not clean_address.startswith('0x'):
-        return f'0x{clean_address}'
-    return clean_address
+def is_valid_eth_address(address: str) -> bool:
+    """Check if the provided string is a valid Ethereum address format."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
 
-def calculate_fee(amount: Decimal, rate: str) -> Decimal:
-    """Calculates network transaction fee based on percentage rate."""
-    fee_rate = Decimal(rate)
-    return (amount * fee_rate).quantize(Decimal('0.00000001'))
 
-def validate_transaction_payload(payload: dict) -> bool:
-    """Ensures all required fields exist in wallet transaction."""
-    required = ['sender', 'receiver', 'amount', 'currency']
-    return all(key in payload for key in required)
+def validate_transaction_payload(payload: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validate incoming transaction payload structure and values."""
+    required_fields = ["sender", "recipient", "amount", "chain_id"]
+    for field in required_fields:
+        if field not in payload:
+            return False, f"Missing required field: {field}"
+
+    if not is_valid_eth_address(payload["sender"]):
+        return False, "Invalid sender wallet address format"
+
+    if not is_valid_eth_address(payload["recipient"]):
+        return False, "Invalid recipient wallet address format"
+
+    amount = payload.get("amount")
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        return False, f"Invalid transaction amount: {amount}"
+
+    chain_id = payload.get("chain_id")
+    if not isinstance(chain_id, int) or chain_id <= 0:
+        return False, f"Invalid network chain_id: {chain_id}"
+
+    return True, "Valid payload"
+
+
+def process_transaction_queue(queue: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Main processing loop that validates and segregates transaction payloads."""
+    processed = []
+    rejected = []
+
+    for idx, item in enumerate(queue):
+        is_valid, reason = validate_transaction_payload(item)
+        if not is_valid:
+            rejected.append({"index": idx, "payload": item, "reason": reason})
+            continue
+
+        processed_item = {
+            "tx_id": f"tx_{idx}_{item['chain_id']}",
+            "sender": item["sender"].lower(),
+            "recipient": item["recipient"].lower(),
+            "amount": float(item["amount"]),
+            "chain_id": item["chain_id"],
+            "status": "ready",
+        }
+        processed.append(processed_item)
+
+    return {
+        "summary": {"total": len(queue), "accepted": len(processed), "rejected": len(rejected)},
+        "processed": processed,
+        "rejected": rejected,
+    }
