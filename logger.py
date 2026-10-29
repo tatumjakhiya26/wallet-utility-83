@@ -1,53 +1,49 @@
-import logging
 import os
-import sys
-from typing import Optional
+import logging
+from logging.handlers import RotatingFileHandler
 
+# Default log directory and settings for wallet operations
+LOG_DIR = "logs"
+LOG_FILE = os.path.join(LOG_DIR, "wallet_utility.log")
+MAX_LOG_BYTES = 5 * 1024 * 1024  # 5 MB per file
+BACKUP_COUNT = 5  # Retain up to 5 archived logs
 
-class WalletFormatter(logging.Formatter):
-    """Custom log formatter tailored for crypto wallet operations."""
-
-    DEFAULT_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
-    DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-    def __init__(self, fmt: Optional[str] = None):
-        super().__init__(fmt=fmt or self.DEFAULT_FORMAT, datefmt=self.DATE_FORMAT)
-
-    def format(self, record: logging.LogRecord) -> str:
-        # Ensure record message is formatted safely
-        return super().format(record)
-
-
-def get_logger(
-    name: str = "wallet_utility",
-    log_level: Optional[str] = None,
-    log_file: Optional[str] = None,
-) -> logging.Logger:
-    """Configures and returns a standard application logger instance."""
+def setup_logger(name: str = "wallet_utility", level: int = logging.INFO) -> logging.Logger:
+    """Configures and returns a logger instance with file rotation and console output."""
     logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-    if logger.hasHandlers():
+    # Prevent adding duplicate handlers if logger is initialized multiple times
+    if logger.handlers:
         return logger
 
-    level_name = log_level or os.getenv("WALLET_LOG_LEVEL", "INFO")
-    numeric_level = getattr(logging, level_name.upper(), logging.INFO)
-    logger.setLevel(numeric_level)
+    # Standard log format for tracking transaction events and utility status
+    formatter = logging.Formatter(
+        fmt="[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
-    formatter = WalletFormatter()
-
-    # Console output handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Console Handler
+    console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
     logger.addHandler(console_handler)
 
-    # Optional file logging handler
-    if log_file:
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    # Rotating File Handler
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR, exist_ok=True)
+
+    file_handler = RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=MAX_LOG_BYTES,
+        backupCount=BACKUP_COUNT,
+        encoding="utf-8"
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(level)
+    logger.addHandler(file_handler)
 
     return logger
 
-
-# Default logger export for quick access
-logger = get_logger()
+# Default module-level logger for instant import
+logger = setup_logger()
