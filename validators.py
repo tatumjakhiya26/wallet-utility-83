@@ -1,53 +1,49 @@
 import re
-from typing import Dict, Any
+from typing import Optional
 
-ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
-BTC_ADDRESS_PATTERN = re.compile(r"^(1|3|[a-km-zA-HJ-NP-Z1-9]{26,35}|bc1[a-z0-9]{39,59})$")
-
-
-def is_valid_eth_address(address: str) -> bool:
-    """Validate if a string matches standard Ethereum address format.
-
-    Args:
-        address: Hexadecimal string representing the Ethereum address.
-
-    Returns:
-        True if valid format, False otherwise.
+def validate_address(address: str, chain_type: str = 'evm') -> bool:
     """
-    if not address or not isinstance(address, str):
-        return False
-    return bool(ETH_ADDRESS_PATTERN.match(address))
-
-
-def is_valid_btc_address(address: str) -> bool:
-    """Validate Bitcoin address format for Legacy, P2SH, or Bech32.
-
+    Validates crypto wallet address formats for specified chains.
+    
     Args:
-        address: String representing the Bitcoin recipient address.
-
+        address: The wallet address string to check.
+        chain_type: The blockchain network type (e.g., 'evm', 'btc').
+        
     Returns:
-        True if address matches Bitcoin formats, False otherwise.
+        bool: True if address is valid, False otherwise.
     """
-    if not address or not isinstance(address, str):
-        return False
-    return bool(BTC_ADDRESS_PATTERN.match(address))
+    if chain_type == 'evm':
+        return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
+    elif chain_type == 'btc':
+        return bool(re.match(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$', address))
+    return False
 
-
-def validate_transaction_payload(payload: Dict[str, Any]) -> bool:
-    """Ensure transaction payload contains required fields and valid amounts.
-
+def validate_amount(amount: str) -> bool:
+    """
+    Checks if a string representation of an amount is a positive number.
+    
     Args:
-        payload: Dictionary containing 'sender', 'recipient', and 'amount'.
-
+        amount: Numeric string to validate.
+        
     Returns:
-        True if payload is structurally sound, False otherwise.
+        bool: True if input is a valid decimal number greater than zero.
     """
-    required_keys = {"sender", "recipient", "amount"}
-    if not required_keys.issubset(payload.keys()):
+    try:
+        value = float(amount)
+        return value > 0
+    except ValueError:
         return False
 
-    amount = payload.get("amount")
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        return False
-
-    return True
+def sanitize_memo(memo: str, max_length: int = 64) -> str:
+    """
+    Sanitizes transaction memos by stripping whitespace and enforcing limits.
+    
+    Args:
+        memo: The raw memo string.
+        max_length: Maximum allowed characters.
+        
+    Returns:
+        str: The sanitized memo string.
+    """
+    clean_memo = re.sub(r'[^a-zA-Z0-9 ]', '', memo).strip()
+    return clean_memo[:max_length]
