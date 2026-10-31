@@ -1,27 +1,30 @@
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Union
+import time
+import functools
+import logging
 
-def format_crypto_amount(amount: Union[str, float, Decimal], decimals: int = 8) -> str:
-    """Normalizes crypto amount string for precision consistency."""
-    try:
-        d_amount = Decimal(str(amount))
-        quantizer = Decimal('1.' + '0' * decimals)
-        return str(d_amount.quantize(quantizer, rounding=ROUND_HALF_UP))
-    except (ValueError, ArithmeticError):
-        return "0.00000000"
+logger = logging.getLogger(__name__)
 
-def calculate_fee(amount: str, fee_rate: float) -> str:
-    """Calculates transaction fee based on percentage rate."""
-    amount_dec = Decimal(amount)
-    fee = amount_dec * Decimal(str(fee_rate))
-    return format_crypto_amount(fee)
-
-def validate_address_format(address: str, chain: str) -> bool:
-    """Validates address length based on network chain."""
-    # Basic length check for common EVM/BTC patterns
-    chain_rules = {
-        "eth": 42,  # 0x + 40 hex
-        "btc": 34   # Legacy address range
-    }
-    expected_len = chain_rules.get(chain.lower())
-    return len(address) == expected_len if expected_len else False
+def retry_network_op(max_retries=3, delay=2, backoff=2):
+    """
+    Decorator to retry network operations with exponential backoff.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            current_delay = delay
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    retries += 1
+                    if retries >= max_retries:
+                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
+                        raise
+                    
+                    logger.warning(f"Retry {retries}/{max_retries} for {func.__name__} after {current_delay}s")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None
+        return wrapper
+    return decorator
