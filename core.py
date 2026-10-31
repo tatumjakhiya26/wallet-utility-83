@@ -1,26 +1,29 @@
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+import functools
+from typing import Dict, Any
 
-def format_crypto_amount(amount: str, decimals: int = 8) -> str:
-    """Standardizes crypto values to specified precision."""
-    try:
-        value = Decimal(amount)
-        quantizer = Decimal('1.' + '0' * decimals)
-        return str(value.quantize(quantizer, rounding=ROUND_HALF_UP))
-    except (ValueError, TypeError):
-        return "0.00000000"
+# Cache for crypto address format validation results
+@functools.lru_cache(maxsize=1024)
+def validate_address_format(address: str, chain_type: str) -> bool:
+    """Validate crypto address structure with LRU caching."""
+    if not address or len(address) < 26:
+        return False
+    return address.isalnum()
 
-def validate_address(address: str, chain: str) -> bool:
-    """Basic length and prefix validation for wallets."""
-    rules = {
-        "btc": (lambda a: len(a) in [26, 34, 42, 62] and a.isalnum()),
-        "eth": (lambda a: len(a) == 42 and a.startswith("0x"))
-    }
-    validator = rules.get(chain.lower())
-    return validator(address) if validator else False
+class TransactionProcessor:
+    """Handles bulk crypto transaction processing with optimization."""
+    def __init__(self):
+        self._buffer: Dict[str, Any] = {}
 
-def calculate_fee(amount: str, rate: float) -> str:
-    """Transaction fee calculation based on network rate."""
-    amount_dec = Decimal(amount)
-    fee = amount_dec * Decimal(str(rate))
-    return str(fee.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP))
+    def process_batch(self, transactions: list) -> list:
+        """Batch processing using list comprehensions for speed."""
+        return [
+            tx for tx in transactions 
+            if validate_address_format(tx.get('addr'), tx.get('type'))
+        ]
+
+    def get_transaction_summary(self, tx_list: list) -> dict:
+        """Efficient aggregation using dictionary generators."""
+        return {
+            "count": len(tx_list),
+            "total_value": sum(float(tx.get('amount', 0)) for tx in tx_list)
+        }
