@@ -1,23 +1,24 @@
 class WalletError(Exception):
-    """Base exception class for wallet operations."""
+    """Base exception for all wallet-utility-83 errors."""
     pass
 
-class InsufficientBalanceError(WalletError):
-    """Raised when transaction amount exceeds available funds."""
-    def __init__(self, requested: float, available: float):
-        super().__init__(f"Insufficient funds: requested {requested}, available {available}")
+class InsufficientFundsError(WalletError):
+    """Raised when transaction amount exceeds balance."""
+    def __init__(self, required, available):
+        super().__init__(f"Required {required}, but only {available} available")
+
+class NetworkConnectionError(WalletError):
+    """Raised when the RPC node is unreachable."""
+    pass
 
 class InvalidAddressError(WalletError):
-    """Raised when a crypto address format is invalid."""
-    def __init__(self, address: str, chain: str):
-        super().__init__(f"Invalid {chain} address format: {address}")
+    """Raised when the destination address is malformed."""
+    pass
 
-class ConnectionTimeoutError(WalletError):
-    """Raised when node communication fails."""
-    def __init__(self, node: str):
-        super().__init__(f"Connection to node {node} timed out")
+class TransactionSigningError(WalletError):
+    """Raised when private key signing fails."""
+    pass
 
-class SigningError(WalletError):
-    """Raised during transaction signing process."""
-    def __init__(self, reason: str):
-        super().__init__(f"Transaction signing failed: {reason}")
+class ValidationError(WalletError):
+    """Raised when input parameters fail schema validation."""
+    pass
