@@ -1,17 +1,17 @@
 # wallet-utility-83
 
-`wallet-utility-83` is a high-performance Python toolkit designed for secure management and bulk processing of cryptocurrency wallets. It provides developers with a streamlined interface to automate address generation, balance reconciliation, and transactional logging across EVM-compatible chains.
+A high-performance Python toolkit for managing hierarchical deterministic (HD) crypto wallets and performing secure blockchain transactions. This utility streamlines complex wallet management tasks, ensuring reliable signing and key derivation for multi-chain environments.
 
-### Key Features
+## Features
 
-*   **BIP-39 Implementation:** Generates hardened mnemonic phrases and derives HD wallet keys locally without exposing private information to third-party APIs.
-*   **Multi-Chain Balance Sync:** Asynchronously queries node providers to fetch real-time balances for ETH, BSC, and Polygon addresses simultaneously.
-*   **Transaction Guard:** Built-in validation suite to prevent accidental sends to blacklisted or non-checksummed addresses.
-*   **CSV Integration:** Effortless import/export functionality for bulk wallet auditing and archival tasks.
+*   **BIP-39 Implementation:** Generate secure mnemonic phrases and derive deterministic addresses using standard derivation paths.
+*   **Multi-Chain Support:** Native integration for EVM-based networks with robust transaction signing and raw payload broadcasting.
+*   **Balance Aggregation:** Efficiently query and parse wallet balances across multiple addresses through RPC interfaces.
+*   **Encrypted Storage:** Built-in AES-256 encryption to secure private keys at rest within your local file system.
 
-### Installation
+## Installation
 
-Ensure you have Python 3.9+ installed. It is recommended to use a virtual environment.
+Ensure you have Python 3.9+ installed. It is recommended to use a virtual environment:
 
 ```bash
 # Clone the repository
@@ -22,30 +22,37 @@ cd wallet-utility-83
 pip install -r requirements.txt
 ```
 
-### Usage
+## Basic Usage
 
-You can use the library to generate a new wallet and check its current balance with a simple script:
+To generate a new wallet and view its details, run the following command:
 
 ```python
 from wallet_utility import WalletManager
 
-# Initialize manager
-wm = WalletManager(network='mainnet')
+# Initialize manager and generate a new BIP-39 wallet
+manager = WalletManager()
+wallet = manager.create_new_wallet(passphrase="secure_optional_password")
 
-# Generate a new HD wallet
-new_wallet = wm.generate_wallet()
-print(f"Address: {new_wallet.address}")
-
-# Check balance
-balance = wm.get_balance(new_wallet.address)
-print(f"Current Balance: {balance} ETH")
+print(f"Address: {wallet.address}")
+print(f"Mnemonic: {wallet.mnemonic}")
 ```
 
-### License
+To sign a transaction manually:
+
+```python
+tx = {
+    'to': '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+    'value': 1000000000000000000,
+    'gas': 21000,
+    'nonce': 0
+}
+
+signed_tx = manager.sign_transaction(tx, private_key=wallet.private_key)
+print(f"Signed Raw Hex: {signed_tx.hex()}")
+```
+
+## License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### Security Warning
-*Always store your mnemonic phrases in a secure, offline environment. This tool performs local operations, but ensure your system is free of malware before managing high-value assets.*
+Distributed under the MIT License. See `LICENSE` for more information.
