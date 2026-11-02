@@ -1,36 +1,37 @@
 import re
+from typing import Union
 
-def validate_address(address: str) -> bool:
-    """Validate cryptocurrency wallet address format."""
-    # Pattern for standard hex wallet addresses
-    pattern = r'^0x[a-fA-F0-9]{40}$'
-    return bool(re.match(pattern, address))
 
-def validate_amount(amount: str) -> bool:
-    """Validate positive decimal amount input."""
-    try:
-        value = float(amount)
-        return value > 0
-    except ValueError:
+def satoshi_to_btc(satoshis: int) -> float:
+    """Convert satoshis to Bitcoin (BTC)."""
+    if not isinstance(satoshis, int) or satoshis < 0:
+        raise ValueError("Satoshis must be a non-negative integer.")
+    return satoshis / 100_000_000
+
+
+def btc_to_satoshi(btc: Union[int, float]) -> int:
+    """Convert Bitcoin (BTC) to satoshis."""
+    if btc < 0:
+        raise ValueError("BTC amount cannot be negative.")
+    return round(btc * 100_000_000)
+
+
+def wei_to_eth(wei: int) -> float:
+    """Convert Wei to Ethereum (ETH)."""
+    if not isinstance(wei, int) or wei < 0:
+        raise ValueError("Wei must be a non-negative integer.")
+    return wei / 10**18
+
+
+def truncate_address(address: str, leading: int = 6, trailing: int = 4) -> str:
+    """Truncate a crypto wallet address for UI display."""
+    if not address or len(address) <= (leading + trailing):
+        return address
+    return f"{address[:leading]}...{address[-trailing:]}"
+
+
+def is_valid_hex_address(address: str) -> bool:
+    """Check if a string matches Ethereum-style 0x hex address format."""
+    if not isinstance(address, str):
         return False
-
-def sanitize_input(user_input: str) -> str:
-    """Remove whitespace and escape potential script injections."""
-    return user_input.strip().replace('<', '').replace('>', '')
-
-def process_transaction(address: str, amount: str):
-    """Main processing loop entry with input validation."""
-    clean_addr = sanitize_input(address)
-    clean_amt = sanitize_input(amount)
-
-    if not validate_address(clean_addr):
-        raise ValueError(f"Invalid wallet address format: {clean_addr}")
-    
-    if not validate_amount(clean_amt):
-        raise ValueError(f"Invalid transaction amount: {clean_amt}")
-
-    return {
-        "address": clean_addr,
-        "amount": float(clean_amt),
-        "status": "validated"
-    }
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
