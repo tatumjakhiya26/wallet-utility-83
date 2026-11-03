@@ -1,37 +1,46 @@
-import re
-from typing import Union
+import time
+import random
+import logging
+from functools import wraps
+from typing import Callable, Any, Tuple, Type
+
+logger = logging.getLogger(__name__)
 
 
-def satoshi_to_btc(satoshis: int) -> float:
-    """Convert satoshis to Bitcoin (BTC)."""
-    if not isinstance(satoshis, int) or satoshis < 0:
-        raise ValueError("Satoshis must be a non-negative integer.")
-    return satoshis / 100_000_000
-
-
-def btc_to_satoshi(btc: Union[int, float]) -> int:
-    """Convert Bitcoin (BTC) to satoshis."""
-    if btc < 0:
-        raise ValueError("BTC amount cannot be negative.")
-    return round(btc * 100_000_000)
-
-
-def wei_to_eth(wei: int) -> float:
-    """Convert Wei to Ethereum (ETH)."""
-    if not isinstance(wei, int) or wei < 0:
-        raise ValueError("Wei must be a non-negative integer.")
-    return wei / 10**18
-
-
-def truncate_address(address: str, leading: int = 6, trailing: int = 4) -> str:
-    """Truncate a crypto wallet address for UI display."""
-    if not address or len(address) <= (leading + trailing):
-        return address
-    return f"{address[:leading]}...{address[-trailing:]}"
-
-
-def is_valid_hex_address(address: str) -> bool:
-    """Check if a string matches Ethereum-style 0x hex address format."""
-    if not isinstance(address, str):
-        return False
-    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+def retry_network_op(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True,
+    retryable_exceptions: Tuple[Type[Exception], ...] = (ConnectionError, TimeoutError, OSError)
+) -> Callable:
+    """
+    Decorator to retry network operations with exponential backoff and optional jitter.
+    Designed for crypto RPC endpoints and API requests.
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            delay = initial_delay
+            
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except retryable_exceptions as exc:
+                    if attempt == max_retries:
+                        logger.error(
+                            f"[RPC/API] '{func.__name__}' failed after {max_retries} attempts: {exc}"
+                        )
+                        raise
+                    
+                    # Calculate wait time with optional 20% jitter
+                    sleep_time = delay * (random.uniform(0.8, 1.2) if jitter else 1.0)
+                    logger.warning(
+                        f"[RPC/API] Network call '{func.__name__}' failed (attempt {attempt}/{max_retries}): {exc}. "
+                        f"Retrying in {sleep_time:.2f} seconds..."
+                    )
+                    time.sleep(sleep_time)
+                    delay *= backoff_factor
+            
+        return wrapper
+    return decorator
