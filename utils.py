@@ -1,30 +1,27 @@
-import time
-import functools
-import logging
+from typing import Dict, Any, Optional
+import decimal
 
-logger = logging.getLogger(__name__)
+def format_crypto_amount(amount: str, precision: int = 8) -> str:
+    """Converts raw string amount to standardized decimal format."""
+    try:
+        d = decimal.Decimal(amount)
+        return format(d, f'.{precision}f').rstrip('0').rstrip('.')
+    except (decimal.InvalidOperation, ValueError):
+        return "0.0"
 
-def retry_network_op(max_retries=3, delay=2, backoff=2):
-    """
-    Decorator to retry network operations with exponential backoff.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            retries = 0
-            current_delay = delay
-            while retries < max_retries:
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    retries += 1
-                    if retries >= max_retries:
-                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
-                        raise
-                    
-                    logger.warning(f"Retry {retries}/{max_retries} for {func.__name__} after {current_delay}s")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
+def sanitize_address(address: str) -> str:
+    """Removes whitespace and forces lowercase for address consistency."""
+    return address.strip().lower()
+
+def calculate_fee(amount: str, rate: float) -> str:
+    """Calculates transaction fee based on provided percentage rate."""
+    try:
+        fee = decimal.Decimal(amount) * decimal.Decimal(str(rate))
+        return str(fee.quantize(decimal.Decimal('0.00000001')))
+    except Exception:
+        return "0.00000000"
+
+def validate_tx_data(data: Dict[str, Any]) -> bool:
+    """Checks for presence of required transaction keys."""
+    required = {'from', 'to', 'value', 'currency'}
+    return all(key in data for key in required)
