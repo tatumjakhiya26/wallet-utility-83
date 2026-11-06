@@ -1,27 +1,43 @@
-from typing import Dict, Any, Optional
-import decimal
+import re
+from decimal import Decimal, ROUND_HALF_UP
 
-def format_crypto_amount(amount: str, precision: int = 8) -> str:
-    """Converts raw string amount to standardized decimal format."""
-    try:
-        d = decimal.Decimal(amount)
-        return format(d, f'.{precision}f').rstrip('0').rstrip('.')
-    except (decimal.InvalidOperation, ValueError):
-        return "0.0"
+SATOSHI_PER_BTC = 100_000_000
+WEI_PER_ETH = 10**18
 
-def sanitize_address(address: str) -> str:
-    """Removes whitespace and forces lowercase for address consistency."""
-    return address.strip().lower()
 
-def calculate_fee(amount: str, rate: float) -> str:
-    """Calculates transaction fee based on provided percentage rate."""
-    try:
-        fee = decimal.Decimal(amount) * decimal.Decimal(str(rate))
-        return str(fee.quantize(decimal.Decimal('0.00000001')))
-    except Exception:
-        return "0.00000000"
+def satoshi_to_btc(satoshis: int) -> Decimal:
+    """Convert satoshis to BTC decimal value."""
+    if satoshis < 0:
+        raise ValueError("Satoshi value cannot be negative")
+    return (Decimal(satoshis) / Decimal(SATOSHI_PER_BTC)).quantize(
+        Decimal("0.00000001")
+    )
 
-def validate_tx_data(data: Dict[str, Any]) -> bool:
-    """Checks for presence of required transaction keys."""
-    required = {'from', 'to', 'value', 'currency'}
-    return all(key in data for key in required)
+
+def wei_to_eth(wei: int) -> Decimal:
+    """Convert Wei to ETH decimal value."""
+    if wei < 0:
+        raise ValueError("Wei value cannot be negative")
+    return Decimal(wei) / Decimal(WEI_PER_ETH)
+
+
+def truncate_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
+    """Truncate a crypto address for UI display."""
+    if not address or len(address) <= (prefix_len + suffix_len):
+        return address
+    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
+
+
+def is_valid_eth_address(address: str) -> bool:
+    """Check if string matches standard Ethereum hexadecimal address format."""
+    if not isinstance(address, str):
+        return False
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
+
+
+def format_fiat_amount(amount: float, symbol: str = "$") -> str:
+    """Format numerical amount as standard currency string."""
+    decimal_val = Decimal(str(amount)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return f"{symbol}{decimal_val:,.2f}"
