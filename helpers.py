@@ -1,46 +1,46 @@
-import time
-import random
-import logging
-from functools import wraps
-from typing import Callable, Any, Tuple, Type
+import decimal
+from typing import Optional
 
-logger = logging.getLogger(__name__)
+# Decimal precision standards for major cryptocurrencies
+ETH_DECIMALS = 18
+BTC_DECIMALS = 8
 
 
-def retry_network_op(
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    backoff_factor: float = 2.0,
-    jitter: bool = True,
-    retryable_exceptions: Tuple[Type[Exception], ...] = (ConnectionError, TimeoutError, OSError)
-) -> Callable:
-    """
-    Decorator to retry network operations with exponential backoff and optional jitter.
-    Designed for crypto RPC endpoints and API requests.
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = initial_delay
-            
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except retryable_exceptions as exc:
-                    if attempt == max_retries:
-                        logger.error(
-                            f"[RPC/API] '{func.__name__}' failed after {max_retries} attempts: {exc}"
-                        )
-                        raise
-                    
-                    # Calculate wait time with optional 20% jitter
-                    sleep_time = delay * (random.uniform(0.8, 1.2) if jitter else 1.0)
-                    logger.warning(
-                        f"[RPC/API] Network call '{func.__name__}' failed (attempt {attempt}/{max_retries}): {exc}. "
-                        f"Retrying in {sleep_time:.2f} seconds..."
-                    )
-                    time.sleep(sleep_time)
-                    delay *= backoff_factor
-            
-        return wrapper
-    return decorator
+def wei_to_eth(wei_value: int) -> decimal.Decimal:
+    """Convert Wei integer amount to ETH Decimal."""
+    if wei_value < 0:
+        raise ValueError("Amount cannot be negative")
+    return decimal.Decimal(wei_value) / decimal.Decimal(10**ETH_DECIMALS)
+
+
+def eth_to_wei(eth_value: float | decimal.Decimal) -> int:
+    """Convert ETH amount to Wei integer precision."""
+    amount = decimal.Decimal(str(eth_value))
+    if amount < 0:
+        raise ValueError("Amount cannot be negative")
+    return int(amount * decimal.Decimal(10**ETH_DECIMALS))
+
+
+def shorten_address(address: str, prefix_len: int = 6, suffix_len: int = 4) -> str:
+    """Format crypto address for UI display (e.g., 0x1234...abcd)."""
+    if not address or len(address) <= prefix_len + suffix_len:
+        return address
+    return f"{address[:prefix_len]}...{address[-suffix_len:]}"
+
+
+def calculate_gas_fee(gas_limit: int, gas_price_gwei: float) -> decimal.Decimal:
+    """Calculate total transaction gas fee in ETH given gas limit and Gwei price."""
+    gwei_decimal = decimal.Decimal(str(gas_price_gwei))
+    eth_per_gwei = decimal.Decimal("1e-9")
+    return decimal.Decimal(gas_limit) * gwei_decimal * eth_per_gwei
+
+
+def get_explorer_url(address: str, chain: str = "ethereum") -> Optional[str]:
+    """Generate block explorer URL for a wallet address on supported chains."""
+    explorers = {
+        "ethereum": f"https://etherscan.io/address/{address}",
+        "polygon": f"https://polygonscan.com/address/{address}",
+        "bsc": f"https://bscscan.com/address/{address}",
+        "bitcoin": f"https://mempool.space/address/{address}",
+    }
+    return explorers.get(chain.lower())
