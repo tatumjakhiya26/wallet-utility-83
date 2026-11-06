@@ -1,16 +1,16 @@
-import json
 import os
+import json
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
     "network": "mainnet",
-    "rpc_timeout": 30,
+    "timeout": 30,
     "retry_attempts": 3,
-    "cache_enabled": True
+    "log_level": "INFO"
 }
 
 def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """Loads configuration from file with fallback to defaults."""
+    """Loads configuration from disk with fallbacks to defaults."""
     config = DEFAULT_CONFIG.copy()
     
     if os.path.exists(config_path):
@@ -19,11 +19,9 @@ def load_config(config_path: str = "config.json") -> Dict[str, Any]:
                 user_config = json.load(f)
                 config.update(user_config)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: failed to load config file: {e}. Using defaults.")
-    
+            print(f"Warning: Failed to load {config_path}: {e}")
+            
     return config
 
-if __name__ == "__main__":
-    # Example usage for wallet-utility-83
-    cfg = load_config()
-    print(f"Loaded network: {cfg.get('network')}")
+# Global config instance for application-wide access
+app_config = load_config()
