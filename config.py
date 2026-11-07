@@ -1,54 +1,64 @@
 import json
 import os
-from dataclasses import asdict, dataclass
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-DEFAULT_CONFIG_PATH = Path.home() / ".wallet_utility" / "config.json"
-
-DEFAULT_SETTINGS: Dict[str, Any] = {
+# Default settings for the crypto wallet utility
+DEFAULT_CONFIG: Dict[str, Any] = {
     "network": "mainnet",
     "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
-    "gas_limit_multiplier": 1.1,
-    "request_timeout": 30,
-    "auto_approve": False,
-    "max_fee_per_gas_gwei": 50.0,
+    "timeout_seconds": 30,
+    "max_retries": 3,
+    "gas_price_multiplier": 1.1,
+    "enable_metrics": False,
     "log_level": "INFO",
+    "cache_ttl_seconds": 300,
 }
 
 
-@dataclass
-class WalletConfig:
-    network: str
-    rpc_url: str
-    gas_limit_multiplier: float
-    request_timeout: int
-    auto_approve: bool
-    max_fee_per_gas_gwei: float
-    log_level: str
+class ConfigLoader:
+    """Loads configuration settings with default fallback and env overrides."""
 
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+    def __init__(self, config_path: str | None = None):
+        self.config_path = config_path or os.getenv("WALLET_CONFIG_PATH", "config.json")
+        self._config: Dict[str, Any] = DEFAULT_CONFIG.copy()
+        self.load_config()
 
+    def load_config(self) -> Dict[str, Any]:
+        """Load config from JSON file if present and apply environment overrides."""
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    file_config = json.load(f)
+                    self._config.update(file_config)
+            except (json.JSONDecodeError, OSError) as err:
+                print(f"Warning: Failed to load config file {self.config_path}: {err}")
 
-def load_config(config_path: Optional[Path] = None) -> WalletConfig:
-    """Load configuration from JSON, using default values as fallback."""
-    target_path = config_path or DEFAULT_CONFIG_PATH
-    merged_settings = DEFAULT_SETTINGS.copy()
+        self._apply_env_overrides()
+        return self._config
 
-    if target_path.exists():
-        try:
-            with open(target_path, "r", encoding="utf-8") as f:
-                user_settings = json.load(f)
-                if isinstance(user_settings, dict):
-                    merged_settings.update(user_settings)
-        except (json.JSONDecodeError, OSError) as err:
-            print(f"Warning: Failed to load config file: {err}")
+    def _apply_env_overrides(self) -> None:
+        """Override configuration options using WALLET_ environment variables."""
+        prefix = "WALLET_"
+        for key, default_val in DEFAULT_CONFIG.items():
+            env_var = prefix + key.upper()
+            if env_var in os.environ:
+                raw_val = os.environ[env_var]
+                val_type = type(default_val)
+                if val_type == bool:
+                    self._config[key] = raw_val.lower() in ("true", "1", "yes")
+                elif val_type in (int, float):
+                    try:
+                        self._config[key] = val_type(raw_val)
+                    except ValueError:
+                        pass
+                else:
+                    self._config[key] = raw_val
 
-    # Apply environment variable overrides if present
-    if env_rpc := os.getenv("WALLET_RPC_URL"):
-        merged_settings["rpc_url"] = env_rpc
-    if env_net := os.getenv("WALLET_NETWORK"):
-        merged_settings["network"] = env_net
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a configuration value by key."""
+        return self._config.get(key, default)
 
-    return WalletConfig(**merged_settings)
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Return a copy of the active configuration dictionary."""
+        return self._config.copy()
