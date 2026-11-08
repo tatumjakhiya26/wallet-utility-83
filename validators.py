@@ -1,29 +1,26 @@
 import re
 
-def is_valid_address(address: str, chain: str = 'eth') -> bool:
-    """Validate cryptocurrency address format based on network."""
-    if not isinstance(address, str):
-        return False
+# Validation patterns for crypto wallet operations
+ADDRESS_PATTERN = re.compile(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^0x[a-fA-F0-9]{40}$')
+AMOUNT_MIN = 0.00000001
 
-    if chain == 'eth':
-        return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
-    elif chain == 'btc':
-        return bool(re.match(r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$', address))
-    
-    return False
+def validate_wallet_address(address: str) -> bool:
+    """Verify address format for supported chains."""
+    return bool(ADDRESS_PATTERN.match(address))
 
-def is_valid_amount(amount: str) -> bool:
-    """Ensure amount is a positive numeric string."""
+def validate_transaction_amount(amount: float) -> bool:
+    """Ensure amount meets dust limits and is positive."""
     try:
-        val = float(amount)
-        return val > 0
+        return float(amount) >= AMOUNT_MIN
     except (ValueError, TypeError):
         return False
 
-def validate_transaction_data(data: dict) -> bool:
-    """Verify required fields for blockchain transactions."""
-    required_fields = {'sender', 'recipient', 'amount', 'currency'}
-    if not all(field in data for field in required_fields):
-        return False
+def validate_input_data(data: dict) -> tuple[bool, str]:
+    """Run checks against incoming transaction dictionary."""
+    if 'address' not in data or not validate_wallet_address(data['address']):
+        return False, "invalid wallet address"
     
-    return is_valid_address(data['sender']) and is_valid_address(data['recipient'])
+    if 'amount' not in data or not validate_transaction_amount(data['amount']):
+        return False, "invalid or insufficient transaction amount"
+        
+    return True, "success"
