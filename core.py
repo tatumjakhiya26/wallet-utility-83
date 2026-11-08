@@ -1,35 +1,40 @@
 import logging
-from typing import Dict, Optional
+from decimal import Decimal, InvalidOperation
+from typing import Optional
 
-class WalletCore:
-    def __init__(self, network: str = 'mainnet'):
-        self.network = network
-        self.logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-    def validate_address(self, address: str) -> bool:
-        """Basic validation for crypto addresses."""
-        if not address or len(address) < 26:
+class WalletError(Exception):
+    """Base exception for wallet operations."""
+    pass
+
+def validate_transaction(amount: str, balance: str) -> bool:
+    """Validates transaction amount against available balance."""
+    try:
+        dec_amount = Decimal(amount)
+        dec_balance = Decimal(balance)
+        
+        if dec_amount <= 0:
+            logger.warning("transaction failed: non-positive amount")
             return False
+        
+        if dec_amount > dec_balance:
+            logger.warning("transaction failed: insufficient funds")
+            return False
+            
         return True
+    except (InvalidOperation, ValueError, TypeError) as e:
+        logger.error(f"validation error: invalid input format - {e}")
+        return False
 
-    def get_wallet_summary(self, wallet_id: str, balances: Dict[str, float]) -> Dict:
-        """Aggregate wallet data for reporting."""
-        total_balance = sum(balances.values())
-        return {
-            "id": wallet_id,
-            "network": self.network,
-            "total": total_balance,
-            "assets": list(balances.keys())
-        }
-
-    def process_transaction(self, tx_data: Dict) -> Optional[str]:
-        """Simplified transaction processing logic."""
-        try:
-            tx_hash = tx_data.get("hash")
-            if not tx_hash:
-                raise ValueError("Missing transaction hash")
-            self.logger.info(f"Processed tx: {tx_hash}")
-            return tx_hash
-        except Exception as e:
-            self.logger.error(f"Processing failed: {e}")
-            return None
+def process_withdrawal(amount: str, balance: str) -> Optional[Decimal]:
+    """Safely processes a withdrawal request with edge case handling.""
+    if not validate_transaction(amount, balance):
+        return None
+        
+    try:
+        new_balance = Decimal(balance) - Decimal(amount)
+        return new_balance
+    except Exception as e:
+        logger.critical(f"unexpected calculation error: {e}")
+        raise WalletError("critical wallet transaction failure") from e
