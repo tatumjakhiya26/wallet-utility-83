@@ -1,64 +1,58 @@
-import json
 import os
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Dict, Optional
 
-# Default settings for the crypto wallet utility
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "network": "mainnet",
-    "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
-    "timeout_seconds": 30,
-    "max_retries": 3,
-    "gas_price_multiplier": 1.1,
-    "enable_metrics": False,
-    "log_level": "INFO",
-    "cache_ttl_seconds": 300,
+
+@dataclass
+class NetworkConfig:
+    chain_id: int
+    rpc_url: str
+    symbol: str
+    explorer_url: str
+    default_gas_limit: int = 21000
+
+
+DEFAULT_NETWORKS: Dict[str, NetworkConfig] = {
+    "mainnet": NetworkConfig(
+        chain_id=1,
+        rpc_url=os.getenv("ETH_MAINNET_RPC", "https://eth.llamarpc.com"),
+        symbol="ETH",
+        explorer_url="https://etherscan.io",
+    ),
+    "polygon": NetworkConfig(
+        chain_id=137,
+        rpc_url=os.getenv("POLYGON_RPC", "https://polygon-rpc.com"),
+        symbol="POL",
+        explorer_url="https://polygonscan.com",
+        default_gas_limit=30000,
+    ),
+    "arbitrum": NetworkConfig(
+        chain_id=42161,
+        rpc_url=os.getenv("ARBITRUM_RPC", "https://arb1.arbitrum.io/rpc"),
+        symbol="ETH",
+        explorer_url="https://arbiscan.io",
+    ),
 }
 
 
-class ConfigLoader:
-    """Loads configuration settings with default fallback and env overrides."""
+class WalletConfigManager:
+    """Manages runtime configuration and network parameters for wallet operations."""
 
-    def __init__(self, config_path: str | None = None):
-        self.config_path = config_path or os.getenv("WALLET_CONFIG_PATH", "config.json")
-        self._config: Dict[str, Any] = DEFAULT_CONFIG.copy()
-        self.load_config()
+    def __init__(self, storage_dir: Optional[str] = None):
+        base_dir = storage_dir or os.getenv("WALLET_STORAGE_DIR", "~/.wallet-utility")
+        self.storage_dir = os.path.expanduser(base_dir)
+        self.networks: Dict[str, NetworkConfig] = DEFAULT_NETWORKS.copy()
+        self._ensure_storage_directory()
 
-    def load_config(self) -> Dict[str, Any]:
-        """Load config from JSON file if present and apply environment overrides."""
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    file_config = json.load(f)
-                    self._config.update(file_config)
-            except (json.JSONDecodeError, OSError) as err:
-                print(f"Warning: Failed to load config file {self.config_path}: {err}")
+    def _ensure_storage_directory(self) -> None:
+        if not os.path.exists(self.storage_dir):
+            os.makedirs(self.storage_dir, mode=0o700, exist_ok=True)
 
-        self._apply_env_overrides()
-        return self._config
+    def get_network(self, name: str) -> NetworkConfig:
+        network = self.networks.get(name.lower())
+        if not network:
+            raise KeyError(f"Unsupported network '{name}' requested")
+        return network
 
-    def _apply_env_overrides(self) -> None:
-        """Override configuration options using WALLET_ environment variables."""
-        prefix = "WALLET_"
-        for key, default_val in DEFAULT_CONFIG.items():
-            env_var = prefix + key.upper()
-            if env_var in os.environ:
-                raw_val = os.environ[env_var]
-                val_type = type(default_val)
-                if val_type == bool:
-                    self._config[key] = raw_val.lower() in ("true", "1", "yes")
-                elif val_type in (int, float):
-                    try:
-                        self._config[key] = val_type(raw_val)
-                    except ValueError:
-                        pass
-                else:
-                    self._config[key] = raw_val
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve a configuration value by key."""
-        return self._config.get(key, default)
-
-    @property
-    def config(self) -> Dict[str, Any]:
-        """Return a copy of the active configuration dictionary."""
-        return self._config.copy()
+    def register_custom_network(self, name: str, config: NetworkConfig) -> None:
+        self.networks[name.lower()] = config
