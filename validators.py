@@ -1,26 +1,30 @@
 import re
 
-# Validation patterns for crypto wallet operations
-ADDRESS_PATTERN = re.compile(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^0x[a-fA-F0-9]{40}$')
-AMOUNT_MIN = 0.00000001
+# regex patterns for crypto validation
+BTC_ADDRESS_REGEX = r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$'
+ETH_ADDRESS_REGEX = r'^0x[a-fA-F0-9]{40}$'
 
-def validate_wallet_address(address: str) -> bool:
-    """Verify address format for supported chains."""
-    return bool(ADDRESS_PATTERN.match(address))
-
-def validate_transaction_amount(amount: float) -> bool:
-    """Ensure amount meets dust limits and is positive."""
-    try:
-        return float(amount) >= AMOUNT_MIN
-    except (ValueError, TypeError):
+def is_valid_address(address: str, chain_type: str) -> bool:
+    """
+    Validates crypto wallet address format based on network type.
+    """
+    if not address or not isinstance(address, str):
         return False
 
-def validate_input_data(data: dict) -> tuple[bool, str]:
-    """Run checks against incoming transaction dictionary."""
-    if 'address' not in data or not validate_wallet_address(data['address']):
-        return False, "invalid wallet address"
-    
-    if 'amount' not in data or not validate_transaction_amount(data['amount']):
-        return False, "invalid or insufficient transaction amount"
-        
-    return True, "success"
+    if chain_type == 'BTC':
+        return bool(re.match(BTC_ADDRESS_REGEX, address))
+    elif chain_type == 'ETH':
+        return bool(re.match(ETH_ADDRESS_REGEX, address))
+    return False
+
+def validate_amount(amount: float) -> bool:
+    """
+    Ensures the transaction amount is positive and within logical bounds.
+    """
+    return isinstance(amount, (int, float)) and amount > 0
+
+def sanitize_input(user_input: str) -> str:
+    """
+    Basic stripping of input for ledger security.
+    """
+    return str(user_input).strip()
