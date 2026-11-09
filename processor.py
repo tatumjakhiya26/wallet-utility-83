@@ -1,33 +1,65 @@
-import functools
-from typing import Dict, Any, List
+import re
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, List, Tuple
 
-# Cache for address validation results to minimize repeated overhead
-@functools.lru_cache(maxsize=1024)
-def validate_address_format(address: str) -> bool:
-    """Performs basic format check for crypto wallet addresses."""
-    return address.startswith('0x') and len(address) == 42
+ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
+BTC_ADDRESS_PATTERN = re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$")
+SUPPORTED_TYPES = {"transfer", "mint", "burn"}
 
-class TransactionProcessor:
-    """Handles batch processing of crypto transactions with optimizations."""
 
-    def __init__(self, batch_size: int = 100):
-        self.batch_size = batch_size
+def validate_transaction_payload(tx: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validates individual transaction fields before processing."""
+    if not isinstance(tx, dict):
+        return False, "Transaction item must be a dictionary"
 
-    def process_transactions(self, tx_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filters and processes transactions using list comprehension for speed."""
-        # Filter valid transactions using pre-compiled logic
-        valid_txs = [
-            tx for tx in tx_list 
-            if validate_address_format(tx.get('address', ''))
-        ]
+    address = tx.get("address")
+    if not address or not isinstance(address, str):
+        return False, "Missing or non-string wallet address"
 
-        return self._execute_batch(valid_txs)
+    if not (ETH_ADDRESS_PATTERN.match(address) or BTC_ADDRESS_PATTERN.match(address)):
+        return False, "Invalid cryptocurrency address format"
 
-    def _execute_batch(self, txs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Simulates batch processing performance optimization."""
-        results = []
-        for i in range(0, len(txs), self.batch_size):
-            chunk = txs[i:i + self.batch_size]
-            # Simulate efficient bulk database or network operation
-            results.extend([{'tx': tx.get('id'), 'status': 'processed'} for tx in chunk])
-        return results
+    raw_amount = tx.get("amount")
+    if raw_amount is None:
+        return False, "Missing transaction amount"
+
+    try:
+        amount = Decimal(str(raw_amount))
+        if amount <= 0:
+            return False, "Amount must be strictly positive"
+    except (InvalidOperation, TypeError, ValueError):
+        return False, "Amount is not a valid numeric value"
+
+    tx_type = str(tx.get("type", "")).lower()
+    if tx_type not in SUPPORTED_TYPES:
+        return False, f"Unsupported transaction type: '{tx_type}'"
+
+    return True, "Valid"
+
+
+def process_transaction_batch(queue: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Main processing loop with input validation for queued transactions."""
+    processed = []
+    rejected = []
+
+    for idx, tx_item in enumerate(queue):
+        is_valid, reason = validate_transaction_payload(tx_item)
+        if not is_valid:
+            rejected.append({"index": idx, "payload": tx_item, "reason": reason})
+            continue
+
+        processed.append({
+            "index": idx,
+            "address": tx_item["address"],
+            "amount": str(Decimal(str(tx_item["amount"]))),
+            "type": str(tx_item["type"]).lower(),
+            "status": "validated"
+        })
+
+    return {
+        "total_count": len(queue),
+        "processed_count": len(processed),
+        "rejected_count": len(rejected),
+        "processed": processed,
+        "rejected": rejected
+    }
