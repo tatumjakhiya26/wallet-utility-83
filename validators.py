@@ -1,30 +1,45 @@
 import re
+from typing import Optional
 
-# regex patterns for crypto validation
-BTC_ADDRESS_REGEX = r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$'
-ETH_ADDRESS_REGEX = r'^0x[a-fA-F0-9]{40}$'
+def validate_bitcoin_address(address: str) -> bool:
+    """
+    Validates a Bitcoin address format using regex.
 
-def is_valid_address(address: str, chain_type: str) -> bool:
+    Args:
+        address: The string address to validate.
+
+    Returns:
+        bool: True if valid, False otherwise.
     """
-    Validates crypto wallet address format based on network type.
+    pattern = r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$'
+    return bool(re.match(pattern, address))
+
+def validate_amount(amount: str) -> bool:
     """
-    if not address or not isinstance(address, str):
+    Checks if a numeric string is a valid positive decimal.
+
+    Args:
+        amount: The string representation of the crypto amount.
+
+    Returns:
+        bool: True if strictly positive numeric value.
+    """
+    try:
+        value = float(amount)
+        return value > 0
+    except ValueError:
         return False
 
-    if chain_type == 'BTC':
-        return bool(re.match(BTC_ADDRESS_REGEX, address))
-    elif chain_type == 'ETH':
-        return bool(re.match(ETH_ADDRESS_REGEX, address))
-    return False
+def sanitize_memo(memo: Optional[str]) -> str:
+    """
+    Ensures the memo field contains only alphanumeric characters.
 
-def validate_amount(amount: float) -> bool:
-    """
-    Ensures the transaction amount is positive and within logical bounds.
-    """
-    return isinstance(amount, (int, float)) and amount > 0
+    Args:
+        memo: The optional transaction memo.
 
-def sanitize_input(user_input: str) -> str:
+    Returns:
+        str: Sanitized string safe for network broadcast.
     """
-    Basic stripping of input for ledger security.
-    """
-    return str(user_input).strip()
+    if not memo:
+        return ""
+    return re.sub(r'[^a-zA-Z0-9]', '', memo)
