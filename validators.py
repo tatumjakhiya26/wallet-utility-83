@@ -1,45 +1,43 @@
 import re
-from typing import Optional
+from typing import Union
 
-def validate_bitcoin_address(address: str) -> bool:
-    """
-    Validates a Bitcoin address format using regex.
+class ValidationError(Exception):
+    """Raised when wallet inputs or payload values fail safety checks."""
+    pass
 
-    Args:
-        address: The string address to validate.
+def validate_wallet_address(address: str, chain: str = "ethereum") -> bool:
+    """Validate standard crypto wallet addresses against network rules."""
+    if not isinstance(address, str) or not address.strip():
+        raise ValidationError("Wallet address must be a non-empty string")
 
-    Returns:
-        bool: True if valid, False otherwise.
-    """
-    pattern = r'^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,59}$'
-    return bool(re.match(pattern, address))
+    clean_address = address.strip()
 
-def validate_amount(amount: str) -> bool:
-    """
-    Checks if a numeric string is a valid positive decimal.
+    if chain.lower() == "ethereum":
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", clean_address):
+            raise ValidationError(f"Invalid Ethereum address format: '{clean_address}'")
+        return True
 
-    Args:
-        amount: The string representation of the crypto amount.
+    elif chain.lower() in ("bitcoin", "btc"):
+        btc_pattern = r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$"
+        if not re.match(btc_pattern, clean_address):
+            raise ValidationError(f"Invalid Bitcoin address format: '{clean_address}'")
+        return True
 
-    Returns:
-        bool: True if strictly positive numeric value.
-    """
+    raise ValidationError(f"Unsupported blockchain network: '{chain}'")
+
+def validate_transaction_amount(amount_raw: Union[int, float, str], max_supply: int = 10**27) -> int:
+    """Safely parse and check transaction amounts in atomic units (wei/sats)."""
     try:
-        value = float(amount)
-        return value > 0
-    except ValueError:
-        return False
+        if isinstance(amount_raw, float) and not amount_raw.is_integer():
+            raise ValidationError(f"Floating point loss detected for amount: {amount_raw}")
+        amount = int(amount_raw)
+    except (ValueError, TypeError) as err:
+        raise ValidationError(f"Invalid transaction amount format: {amount_raw}") from err
 
-def sanitize_memo(memo: Optional[str]) -> str:
-    """
-    Ensures the memo field contains only alphanumeric characters.
+    if amount <= 0:
+        raise ValidationError(f"Transaction amount must be positive, got {amount}")
 
-    Args:
-        memo: The optional transaction memo.
+    if amount > max_supply:
+        raise ValidationError(f"Amount {amount} exceeds safety limit {max_supply}")
 
-    Returns:
-        str: Sanitized string safe for network broadcast.
-    """
-    if not memo:
-        return ""
-    return re.sub(r'[^a-zA-Z0-9]', '', memo)
+    return amount
