@@ -1,58 +1,47 @@
 # wallet-utility-83
 
-A high-performance Python toolkit for managing hierarchical deterministic (HD) crypto wallets and performing secure blockchain transactions. This utility streamlines complex wallet management tasks, ensuring reliable signing and key derivation for multi-chain environments.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+`wallet-utility-83` is a lightweight Python toolkit designed for non-custodial EVM wallet management and multi-chain balance aggregation. It simplifies HD wallet derivation, automated token tracking, and local transaction signing without relying on third-party backend servers.
 
 ## Features
 
-*   **BIP-39 Implementation:** Generate secure mnemonic phrases and derive deterministic addresses using standard derivation paths.
-*   **Multi-Chain Support:** Native integration for EVM-based networks with robust transaction signing and raw payload broadcasting.
-*   **Balance Aggregation:** Efficiently query and parse wallet balances across multiple addresses through RPC interfaces.
-*   **Encrypted Storage:** Built-in AES-256 encryption to secure private keys at rest within your local file system.
+* **BIP-44 HD Wallet Derivation:** Deterministically generate EVM-compatible addresses and private keys from standard 12 or 24-word seed phrases.
+* **Multi-Chain ERC-20 Tracking:** Query Native (ETH, MATIC, BNB) and custom ERC-20 token balances across multiple RPC endpoints concurrently.
+* **Offline Transaction Builder:** Form, sign, and serialize EVM transactions locally using raw private keys for enhanced operational security.
+* **Gas Estimation Engine:** Calculate dynamic EIP-1559 gas fees based on real-time network block header analysis.
 
 ## Installation
 
-Ensure you have Python 3.9+ installed. It is recommended to use a virtual environment:
+Install the package directly from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/Developer/wallet-utility-83.git
 cd wallet-utility-83
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Basic Usage
+## Quick Start
 
-To generate a new wallet and view its details, run the following command:
+The following example demonstrates how to derive an address from a mnemonic and check its native ETH balance.
 
 ```python
 from wallet_utility import WalletManager
 
-# Initialize manager and generate a new BIP-39 wallet
-manager = WalletManager()
-wallet = manager.create_new_wallet(passphrase="secure_optional_password")
+# Initialize manager with an Ethereum RPC endpoint
+wm = WalletManager(rpc_url="https://cloudflare-eth.com")
 
-print(f"Address: {wallet.address}")
-print(f"Mnemonic: {wallet.mnemonic}")
-```
+# Derive account at index 0 from a standard mnemonic
+mnemonic = "test test test test test test test test test test test junk"
+account = wm.from_mnemonic(mnemonic, account_index=0)
 
-To sign a transaction manually:
+print(f"Derived Address: {account.address}")
 
-```python
-tx = {
-    'to': '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-    'value': 1000000000000000000,
-    'gas': 21000,
-    'nonce': 0
-}
-
-signed_tx = manager.sign_transaction(tx, private_key=wallet.private_key)
-print(f"Signed Raw Hex: {signed_tx.hex()}")
+# Fetch real-time balance
+balance = wm.get_native_balance(account.address)
+print(f"ETH Balance: {balance:.4f} ETH")
 ```
 
 ## License
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Distributed under the MIT License. See `LICENSE` for more information.
