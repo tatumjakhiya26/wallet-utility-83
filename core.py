@@ -1,40 +1,39 @@
-import logging
-from decimal import Decimal, InvalidOperation
-from typing import Optional
+import re
 
-logger = logging.getLogger(__name__)
+# wallet-utility-83 core processing
 
-class WalletError(Exception):
-    """Base exception for wallet operations."""
-    pass
+def validate_address(address: str) -> bool:
+    # validate standard bitcoin-style address format
+    return bool(re.match(r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$', address))
 
-def validate_transaction(amount: str, balance: str) -> bool:
-    """Validates transaction amount against available balance."""
+def validate_amount(amount: str) -> bool:
     try:
-        dec_amount = Decimal(amount)
-        dec_balance = Decimal(balance)
-        
-        if dec_amount <= 0:
-            logger.warning("transaction failed: non-positive amount")
-            return False
-        
-        if dec_amount > dec_balance:
-            logger.warning("transaction failed: insufficient funds")
-            return False
-            
-        return True
-    except (InvalidOperation, ValueError, TypeError) as e:
-        logger.error(f"validation error: invalid input format - {e}")
+        val = float(amount)
+        return val > 0
+    except ValueError:
         return False
 
-def process_withdrawal(amount: str, balance: str) -> Optional[Decimal]:
-    """Safely processes a withdrawal request with edge case handling.""
-    if not validate_transaction(amount, balance):
-        return None
-        
-    try:
-        new_balance = Decimal(balance) - Decimal(amount)
-        return new_balance
-    except Exception as e:
-        logger.critical(f"unexpected calculation error: {e}")
-        raise WalletError("critical wallet transaction failure") from e
+def run_processor(data_stream: list):
+    """Process stream of wallet transactions with input validation."""
+    for entry in data_stream:
+        address = entry.get('address', '')
+        amount = entry.get('amount', '0')
+
+        if not validate_address(address):
+            print(f"[ERROR] Invalid address format: {address}")
+            continue
+
+        if not validate_amount(amount):
+            print(f"[ERROR] Invalid transaction amount: {amount}")
+            continue
+
+        # process verified transaction
+        print(f"[SUCCESS] Processing {amount} to {address}")
+
+if __name__ == '__main__':
+    mock_data = [
+        {'address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', 'amount': '0.5'},
+        {'address': 'invalid_addr', 'amount': '0.1'},
+        {'address': '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy', 'amount': '-5'}
+    ]
+    run_processor(mock_data)
