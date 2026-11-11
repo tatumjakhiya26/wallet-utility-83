@@ -1,35 +1,53 @@
+import os
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
 
-# Configure centralized logger for wallet-utility-83
-logger = logging.getLogger('wallet_utility')
-logger.setLevel(logging.INFO)
+DEFAULT_LOG_DIR = "logs"
+DEFAULT_LOG_FILE = "wallet.log"
+MAX_BYTES = 5 * 1024 * 1024  # 5 MB per log file
+BACKUP_COUNT = 5
 
-console_handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
 
-def log_error(context: str, error: Exception, critical: bool = False) -> None:
-    """Handles logging of edge cases and exceptions during crypto ops."""
-    error_type = type(error).__name__
-    message = f"Error in {context}: [{error_type}] {str(error)}"
-    
-    if critical:
-        logger.critical(message)
-    else:
-        logger.error(message)
+def setup_logger(
+    name: str = "wallet_utility",
+    log_dir: str = DEFAULT_LOG_DIR,
+    log_file: str = DEFAULT_LOG_FILE,
+    level: int = logging.INFO,
+    max_bytes: int = MAX_BYTES,
+    backup_count: int = BACKUP_COUNT,
+) -> logging.Logger:
+    """Configures and returns a logger instance with console and rotating file handlers."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-def safe_log_operation(func):
-    """Decorator for catching exceptions during wallet interactions."""
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (ValueError, ConnectionError, TypeError) as e:
-            log_error(func.__name__, e)
-            return None
-        except Exception as e:
-            log_error(func.__name__, e, critical=True)
-            raise
-    return wrapper
+    # Prevent adding duplicate handlers if function is called multiple times
+    if logger.handlers:
+        return logger
+
+    os.makedirs(log_dir, exist_ok=True)
+    file_path = os.path.join(log_dir, log_file)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    file_handler = RotatingFileHandler(
+        file_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    return logger
+
+
+wallet_logger = setup_logger()
