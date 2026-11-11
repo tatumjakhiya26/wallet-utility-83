@@ -1,51 +1,59 @@
 import os
 import json
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Any, Dict
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "network": "mainnet",
     "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
     "chain_id": 1,
-    "gas_limit_multiplier": 1.15,
     "request_timeout": 30,
     "max_retries": 3,
+    "gas_limit_multiplier": 1.15,
+    "data_dir": str(Path.home() / ".wallet_utility"),
     "enable_metrics": False,
-    "cache_ttl_seconds": 300,
 }
 
+class WalletConfig:
+    """Manages application settings with environment overrides and fallback defaults."""
 
-class ConfigManager:
-    """Manages application configuration loading and fallback to defaults."""
+    def __init__(self, config_dict: Dict[str, Any] = None):
+        self._settings = DEFAULT_CONFIG.copy()
+        if config_dict:
+            self._settings.update(config_dict)
+        self._load_env_overrides()
 
-    def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path
-        self._config: Dict[str, Any] = DEFAULT_CONFIG.copy()
-        self._load()
-
-    def _load(self) -> None:
-        # Overwrite defaults with file configuration if provided and exists
-        if self.config_path and os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    file_config = json.load(f)
-                    if isinstance(file_config, dict):
-                        self._config.update(file_config)
-            except (json.JSONDecodeError, OSError):
-                pass  # Fall back to defaults on read error
-
-        # Environment variables take precedence over file and defaults
-        env_rpc = os.getenv("WALLET_RPC_URL")
-        if env_rpc:
-            self._config["rpc_url"] = env_rpc
-
-        env_network = os.getenv("WALLET_NETWORK")
-        if env_network:
-            self._config["network"] = env_network
+    def _load_env_overrides(self) -> None:
+        """Override configuration values using defined environment variables."""
+        env_mappings = {
+            "WALLET_NETWORK": ("network", str),
+            "WALLET_RPC_URL": ("rpc_url", str),
+            "WALLET_CHAIN_ID": ("chain_id", int),
+            "WALLET_TIMEOUT": ("request_timeout", int),
+            "WALLET_DATA_DIR": ("data_dir", str),
+        }
+        for env_var, (key, type_cast) in env_mappings.items():
+            val = os.getenv(env_var)
+            if val is not None:
+                try:
+                    self._settings[key] = type_cast(val)
+                except ValueError:
+                    pass
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve a configuration value by key."""
-        return self._config.get(key, default)
+        """Retrieve a configuration option by key."""
+        return self._settings.get(key, default)
 
-    def as_dict(self) -> Dict[str, Any]:
-        """Return a copy of the active configuration dictionary."""
-        return self._config.copy()
+    @classmethod
+    def load_from_file(cls, filepath: str) -> "WalletConfig":
+        """Load configuration settings from a JSON file."""
+        path = Path(filepath)
+        if not path.is_file():
+            return cls()
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return cls(data)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a copy of current active settings."""
+        return self._settings.copy()
