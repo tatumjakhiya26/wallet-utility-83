@@ -1,55 +1,48 @@
-import time
-import logging
-from functools import wraps
-from typing import Callable, Any, Tuple, Type
+from typing import Optional, Dict, Any
+import hashlib
+import hmac
 
-logger = logging.getLogger("wallet_utility.utils")
-
-
-def retry_network_op(
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    backoff_factor: float = 2.0,
-    retryable_exceptions: Tuple[Type[Exception], ...] = (ConnectionError, TimeoutError)
-) -> Callable:
+def generate_signature(api_secret: str, payload: str) -> str:
     """
-    Decorator to retry RPC node requests or API calls with exponential backoff.
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = initial_delay
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except retryable_exceptions as err:
-                    if attempt == max_retries:
-                        logger.error(f"Final attempt {attempt} failed for {func.__name__}: {err}")
-                        raise err
-                    
-                    logger.warning(
-                        f"Network call {func.__name__} failed (attempt {attempt}/{max_retries}): {err}. "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    time.sleep(delay)
-                    delay *= backoff_factor
-            return None
-        return wrapper
-    return decorator
+    Generates an HMAC-SHA256 signature for API requests.
 
+    Args:
+        api_secret: The private key for the wallet account.
+        payload: The JSON-encoded request body or parameters.
 
-@retry_network_op(max_retries=3, initial_delay=0.5)
-def execute_rpc_call(endpoint: str, method: str, params: list = None) -> dict:
+    Returns:
+        A hex-encoded signature string.
     """
-    Executes a standard JSON-RPC payload request to a blockchain endpoint.
+    return hmac.new(
+        api_secret.encode('utf-8'),
+        payload.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+def format_currency(amount: float, precision: int = 8) -> str:
     """
-    if not endpoint.startswith("http"):
-        raise ValueError("Invalid RPC endpoint protocol")
-    
-    payload = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params or [],
-        "id": 1
-    }
-    return {"status": "success", "endpoint": endpoint, "payload": payload}
+    Formats float crypto amounts to standardized decimal strings.
+
+    Args:
+        amount: The numerical value to format.
+        precision: The number of decimal places allowed.
+
+    Returns:
+        String representation of the amount with fixed precision.
+    """
+    return f"{amount:.{precision}f}"
+
+def validate_address(address: str, chain: str = 'BTC') -> bool:
+    """
+    Checks if a wallet address follows expected format conventions.
+
+    Args:
+        address: The string address to validate.
+        chain: The identifier for the blockchain network.
+
+    Returns:
+        Boolean indicating format validity.
+    """
+    if chain == 'BTC':
+        return len(address) in range(26, 36) and address.isalnum()
+    return len(address) == 42 and address.startswith('0x')
