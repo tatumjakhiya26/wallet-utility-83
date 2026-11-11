@@ -1,58 +1,51 @@
 import os
-from dataclasses import dataclass
-from typing import Dict, Optional
+import json
+from typing import Dict, Any, Optional
 
-
-@dataclass
-class NetworkConfig:
-    chain_id: int
-    rpc_url: str
-    symbol: str
-    explorer_url: str
-    default_gas_limit: int = 21000
-
-
-DEFAULT_NETWORKS: Dict[str, NetworkConfig] = {
-    "mainnet": NetworkConfig(
-        chain_id=1,
-        rpc_url=os.getenv("ETH_MAINNET_RPC", "https://eth.llamarpc.com"),
-        symbol="ETH",
-        explorer_url="https://etherscan.io",
-    ),
-    "polygon": NetworkConfig(
-        chain_id=137,
-        rpc_url=os.getenv("POLYGON_RPC", "https://polygon-rpc.com"),
-        symbol="POL",
-        explorer_url="https://polygonscan.com",
-        default_gas_limit=30000,
-    ),
-    "arbitrum": NetworkConfig(
-        chain_id=42161,
-        rpc_url=os.getenv("ARBITRUM_RPC", "https://arb1.arbitrum.io/rpc"),
-        symbol="ETH",
-        explorer_url="https://arbiscan.io",
-    ),
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "network": "mainnet",
+    "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/demo",
+    "chain_id": 1,
+    "gas_limit_multiplier": 1.15,
+    "request_timeout": 30,
+    "max_retries": 3,
+    "enable_metrics": False,
+    "cache_ttl_seconds": 300,
 }
 
 
-class WalletConfigManager:
-    """Manages runtime configuration and network parameters for wallet operations."""
+class ConfigManager:
+    """Manages application configuration loading and fallback to defaults."""
 
-    def __init__(self, storage_dir: Optional[str] = None):
-        base_dir = storage_dir or os.getenv("WALLET_STORAGE_DIR", "~/.wallet-utility")
-        self.storage_dir = os.path.expanduser(base_dir)
-        self.networks: Dict[str, NetworkConfig] = DEFAULT_NETWORKS.copy()
-        self._ensure_storage_directory()
+    def __init__(self, config_path: Optional[str] = None):
+        self.config_path = config_path
+        self._config: Dict[str, Any] = DEFAULT_CONFIG.copy()
+        self._load()
 
-    def _ensure_storage_directory(self) -> None:
-        if not os.path.exists(self.storage_dir):
-            os.makedirs(self.storage_dir, mode=0o700, exist_ok=True)
+    def _load(self) -> None:
+        # Overwrite defaults with file configuration if provided and exists
+        if self.config_path and os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    file_config = json.load(f)
+                    if isinstance(file_config, dict):
+                        self._config.update(file_config)
+            except (json.JSONDecodeError, OSError):
+                pass  # Fall back to defaults on read error
 
-    def get_network(self, name: str) -> NetworkConfig:
-        network = self.networks.get(name.lower())
-        if not network:
-            raise KeyError(f"Unsupported network '{name}' requested")
-        return network
+        # Environment variables take precedence over file and defaults
+        env_rpc = os.getenv("WALLET_RPC_URL")
+        if env_rpc:
+            self._config["rpc_url"] = env_rpc
 
-    def register_custom_network(self, name: str, config: NetworkConfig) -> None:
-        self.networks[name.lower()] = config
+        env_network = os.getenv("WALLET_NETWORK")
+        if env_network:
+            self._config["network"] = env_network
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a configuration value by key."""
+        return self._config.get(key, default)
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return a copy of the active configuration dictionary."""
+        return self._config.copy()
