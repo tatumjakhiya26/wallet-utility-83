@@ -1,65 +1,33 @@
-import re
-from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Tuple
+import logging
 
-ETH_ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
-BTC_ADDRESS_PATTERN = re.compile(r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$")
-SUPPORTED_TYPES = {"transfer", "mint", "burn"}
+class TransactionError(Exception):
+    pass
 
-
-def validate_transaction_payload(tx: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validates individual transaction fields before processing."""
-    if not isinstance(tx, dict):
-        return False, "Transaction item must be a dictionary"
-
-    address = tx.get("address")
-    if not address or not isinstance(address, str):
-        return False, "Missing or non-string wallet address"
-
-    if not (ETH_ADDRESS_PATTERN.match(address) or BTC_ADDRESS_PATTERN.match(address)):
-        return False, "Invalid cryptocurrency address format"
-
-    raw_amount = tx.get("amount")
-    if raw_amount is None:
-        return False, "Missing transaction amount"
-
+def process_transaction(wallet_data: dict, amount: float) -> bool:
+    """Validates and processes wallet transactions with edge case handling."""
+    logger = logging.getLogger(__name__)
+    
     try:
-        amount = Decimal(str(raw_amount))
-        if amount <= 0:
-            return False, "Amount must be strictly positive"
-    except (InvalidOperation, TypeError, ValueError):
-        return False, "Amount is not a valid numeric value"
-
-    tx_type = str(tx.get("type", "")).lower()
-    if tx_type not in SUPPORTED_TYPES:
-        return False, f"Unsupported transaction type: '{tx_type}'"
-
-    return True, "Valid"
-
-
-def process_transaction_batch(queue: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Main processing loop with input validation for queued transactions."""
-    processed = []
-    rejected = []
-
-    for idx, tx_item in enumerate(queue):
-        is_valid, reason = validate_transaction_payload(tx_item)
-        if not is_valid:
-            rejected.append({"index": idx, "payload": tx_item, "reason": reason})
-            continue
-
-        processed.append({
-            "index": idx,
-            "address": tx_item["address"],
-            "amount": str(Decimal(str(tx_item["amount"]))),
-            "type": str(tx_item["type"]).lower(),
-            "status": "validated"
-        })
-
-    return {
-        "total_count": len(queue),
-        "processed_count": len(processed),
-        "rejected_count": len(rejected),
-        "processed": processed,
-        "rejected": rejected
-    }
+        if not isinstance(amount, (int, float)) or amount <= 0:
+            raise TransactionError(f"Invalid transaction amount: {amount}")
+        
+        balance = wallet_data.get("balance", 0)
+        if balance < amount:
+            raise TransactionError("Insufficient funds in wallet")
+            
+        if "address" not in wallet_data or not wallet_data["address"]:
+            raise TransactionError("Missing destination address")
+            
+        # Simulation of core processing logic
+        wallet_data["balance"] -= amount
+        return True
+        
+    except (TypeError, KeyError) as e:
+        logger.error(f"Data structure mismatch: {e}")
+        return False
+    except TransactionError as e:
+        logger.warning(f"Transaction rejection: {e}")
+        return False
+    except Exception as e:
+        logger.critical(f"Unexpected system failure: {e}")
+        return False
