@@ -1,53 +1,34 @@
-import os
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 
-DEFAULT_LOG_DIR = "logs"
-DEFAULT_LOG_FILE = "wallet.log"
-MAX_BYTES = 5 * 1024 * 1024  # 5 MB per log file
-BACKUP_COUNT = 5
+LOG_FILE = "wallet_utility.log"
+MAX_BYTES = 5 * 1024 * 1024
+BACKUP_COUNT = 3
 
-
-def setup_logger(
-    name: str = "wallet_utility",
-    log_dir: str = DEFAULT_LOG_DIR,
-    log_file: str = DEFAULT_LOG_FILE,
-    level: int = logging.INFO,
-    max_bytes: int = MAX_BYTES,
-    backup_count: int = BACKUP_COUNT,
-) -> logging.Logger:
-    """Configures and returns a logger instance with console and rotating file handlers."""
+def setup_logger(name: str = "wallet_utility") -> logging.Logger:
+    """Configures a rotating file logger for the wallet utility."""
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
 
-    # Prevent adding duplicate handlers if function is called multiple times
-    if logger.handlers:
-        return logger
+    if not logger.handlers:
+        # Format: timestamp - module - level - message
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
 
-    os.makedirs(log_dir, exist_ok=True)
-    file_path = os.path.join(log_dir, log_file)
+        # Rotating file handler (5MB per file, keep 3 backups)
+        file_handler = RotatingFileHandler(
+            LOG_FILE, 
+            maxBytes=MAX_BYTES, 
+            backupCount=BACKUP_COUNT
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    file_handler = RotatingFileHandler(
-        file_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(level)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+        # Also output to console for development visibility
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
-
-
-wallet_logger = setup_logger()
