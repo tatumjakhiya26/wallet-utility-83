@@ -1,30 +1,18 @@
-import functools
-import time
-from typing import Any, Callable, Dict
+import decimal
+from typing import Union
 
-# Cache for address validation results to improve performance
-_cache: Dict[str, bool] = {}
+def normalize_amount(amount: Union[str, float, int]) -> decimal.Decimal:
+    """Converts varying input types to precise Decimal for crypto math."""
+    return decimal.Decimal(str(amount)).quantize(decimal.Decimal('0.00000001'), rounding=decimal.ROUND_DOWN)
 
-def memoize_validation(func: Callable) -> Callable:
-    """Decorator to cache expensive validation checks."""
-    @functools.wraps(func)
-    def wrapper(address: str, *args, **kwargs) -> bool:
-        if address not in _cache:
-            _cache[address] = func(address, *args, **kwargs)
-        return _cache[address]
-    return wrapper
+def format_address(address: str) -> str:
+    """Standardizes address string format for blockchain compatibility."""
+    return address.strip().lower()
 
-@memoize_validation
-def validate_address_format(address: str) -> bool:
-    """Simulate complex crypto address structure verification."""
-    time.sleep(0.1)  # Simulate network/compute overhead
-    return address.startswith('0x') and len(address) == 42
+def validate_fee_rate(fee: float) -> bool:
+    """Ensures fee remains within sane protocol bounds."""
+    return 0.00000001 <= fee <= 0.1
 
-def batch_process_addresses(addresses: list[str]) -> list[bool]:
-    """Bulk verification utilizing memoized checks."""
-    return [validate_address_format(addr) for addr in addresses]
-
-# Optimization for high-frequency call cleanup
-def clear_validation_cache() -> None:
-    """Evict cache to prevent memory bloat."""
-    _cache.clear()
+def format_transaction_summary(tx_id: str, amount: decimal.Decimal) -> str:
+    """Consistent reporting format for wallet logs."""
+    return f"TX[{tx_id}]: {amount.normalize()} units processed"
