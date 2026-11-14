@@ -1,43 +1,43 @@
 import re
-from typing import Union
+from typing import Any
 
-class ValidationError(Exception):
-    """Raised when wallet inputs or payload values fail safety checks."""
-    pass
 
-def validate_wallet_address(address: str, chain: str = "ethereum") -> bool:
-    """Validate standard crypto wallet addresses against network rules."""
-    if not isinstance(address, str) or not address.strip():
-        raise ValidationError("Wallet address must be a non-empty string")
+def is_valid_eth_address(address: str) -> bool:
+    """Validate Ethereum address format (40 hex characters with 0x prefix)."""
+    if not isinstance(address, str):
+        return False
+    pattern = r"^0x[a-fA-F0-9]{40}$"
+    return bool(re.match(pattern, address))
 
-    clean_address = address.strip()
 
-    if chain.lower() == "ethereum":
-        if not re.match(r"^0x[a-fA-F0-9]{40}$", clean_address):
-            raise ValidationError(f"Invalid Ethereum address format: '{clean_address}'")
-        return True
+def is_valid_btc_address(address: str) -> bool:
+    """Validate basic Bitcoin legacy, SegWit, and Native SegWit address formats."""
+    if not isinstance(address, str):
+        return False
+    pattern = r"^(1|3|bc1q)[a-zA-HJ-NP-Z0-9]{25,62}$"
+    return bool(re.match(pattern, address))
 
-    elif chain.lower() in ("bitcoin", "btc"):
-        btc_pattern = r"^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$"
-        if not re.match(btc_pattern, clean_address):
-            raise ValidationError(f"Invalid Bitcoin address format: '{clean_address}'")
-        return True
 
-    raise ValidationError(f"Unsupported blockchain network: '{chain}'")
+def is_valid_private_key(key: str) -> bool:
+    """Check if a string is a 64-character raw hex private key."""
+    if not isinstance(key, str):
+        return False
+    clean_key = key.lower().removeprefix("0x")
+    return len(clean_key) == 64 and all(c in "0123456789abcdef" for c in clean_key)
 
-def validate_transaction_amount(amount_raw: Union[int, float, str], max_supply: int = 10**27) -> int:
-    """Safely parse and check transaction amounts in atomic units (wei/sats)."""
+
+def is_valid_tx_hash(tx_hash: str) -> bool:
+    """Validate standard 32-byte (64 hex character) transaction hash."""
+    if not isinstance(tx_hash, str):
+        return False
+    clean_hash = tx_hash.lower().removeprefix("0x")
+    return len(clean_hash) == 64 and all(c in "0123456789abcdef" for c in clean_hash)
+
+
+def validate_amount(amount: Any, min_amount: float = 0.0) -> bool:
+    """Ensure numerical amount is valid and strictly greater than threshold."""
     try:
-        if isinstance(amount_raw, float) and not amount_raw.is_integer():
-            raise ValidationError(f"Floating point loss detected for amount: {amount_raw}")
-        amount = int(amount_raw)
-    except (ValueError, TypeError) as err:
-        raise ValidationError(f"Invalid transaction amount format: {amount_raw}") from err
-
-    if amount <= 0:
-        raise ValidationError(f"Transaction amount must be positive, got {amount}")
-
-    if amount > max_supply:
-        raise ValidationError(f"Amount {amount} exceeds safety limit {max_supply}")
-
-    return amount
+        val = float(amount)
+        return val > min_amount
+    except (ValueError, TypeError):
+        return False
