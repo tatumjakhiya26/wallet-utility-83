@@ -1,43 +1,47 @@
 import re
-from typing import Any
 
 
 def is_valid_eth_address(address: str) -> bool:
-    """Validate Ethereum address format (40 hex characters with 0x prefix)."""
+    """Check if string is a valid Ethereum hex address."""
     if not isinstance(address, str):
         return False
-    pattern = r"^0x[a-fA-F0-9]{40}$"
-    return bool(re.match(pattern, address))
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", address))
 
 
 def is_valid_btc_address(address: str) -> bool:
-    """Validate basic Bitcoin legacy, SegWit, and Native SegWit address formats."""
+    """Check if string is a valid Bitcoin address (Legacy, P2SH, or SegWit)."""
     if not isinstance(address, str):
         return False
-    pattern = r"^(1|3|bc1q)[a-zA-HJ-NP-Z0-9]{25,62}$"
-    return bool(re.match(pattern, address))
+    legacy_pattern = r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
+    segwit_pattern = r"^bc1[a-0-9]{39,59}$"
+    return bool(re.match(legacy_pattern, address) or re.match(segwit_pattern, address))
 
 
-def is_valid_private_key(key: str) -> bool:
-    """Check if a string is a 64-character raw hex private key."""
-    if not isinstance(key, str):
+def is_valid_sol_address(address: str) -> bool:
+    """Check if string is a valid Base58 Solana public key address."""
+    if not isinstance(address, str):
         return False
-    clean_key = key.lower().removeprefix("0x")
-    return len(clean_key) == 64 and all(c in "0123456789abcdef" for c in clean_key)
+    sol_pattern = r"^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+    return bool(re.match(sol_pattern, address))
 
 
-def is_valid_tx_hash(tx_hash: str) -> bool:
-    """Validate standard 32-byte (64 hex character) transaction hash."""
-    if not isinstance(tx_hash, str):
-        return False
-    clean_hash = tx_hash.lower().removeprefix("0x")
-    return len(clean_hash) == 64 and all(c in "0123456789abcdef" for c in clean_hash)
-
-
-def validate_amount(amount: Any, min_amount: float = 0.0) -> bool:
-    """Ensure numerical amount is valid and strictly greater than threshold."""
-    try:
-        val = float(amount)
-        return val > min_amount
-    except (ValueError, TypeError):
-        return False
+def validate_wallet_address(address: str, chain: str) -> bool:
+    """
+    Validate a wallet address for a specified crypto chain.
+    
+    Supported chains: 'eth', 'btc', 'sol'
+    """
+    chain_map = {
+        "eth": is_valid_eth_address,
+        "ethereum": is_valid_eth_address,
+        "btc": is_valid_btc_address,
+        "bitcoin": is_valid_btc_address,
+        "sol": is_valid_sol_address,
+        "solana": is_valid_sol_address,
+    }
+    
+    validator = chain_map.get(chain.lower().strip())
+    if not validator:
+        raise ValueError(f"Unsupported blockchain network: {chain}")
+    
+    return validator(address)
