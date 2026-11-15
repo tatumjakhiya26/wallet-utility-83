@@ -1,18 +1,30 @@
-import decimal
-from typing import Union
+import time
+import functools
+import logging
+from typing import Callable, Any
 
-def normalize_amount(amount: Union[str, float, int]) -> decimal.Decimal:
-    """Converts varying input types to precise Decimal for crypto math."""
-    return decimal.Decimal(str(amount)).quantize(decimal.Decimal('0.00000001'), rounding=decimal.ROUND_DOWN)
+logger = logging.getLogger(__name__)
 
-def format_address(address: str) -> str:
-    """Standardizes address string format for blockchain compatibility."""
-    return address.strip().lower()
-
-def validate_fee_rate(fee: float) -> bool:
-    """Ensures fee remains within sane protocol bounds."""
-    return 0.00000001 <= fee <= 0.1
-
-def format_transaction_summary(tx_id: str, amount: decimal.Decimal) -> str:
-    """Consistent reporting format for wallet logs."""
-    return f"TX[{tx_id}]: {amount.normalize()} units processed"
+def retry_network_op(retries: int = 3, backoff: float = 2.0):
+    """
+    Decorator for retrying network operations with exponential backoff.
+    """
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            delay = 1.0
+            
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(delay)
+                    delay *= backoff
+            
+            logger.error("Max retries exceeded for network operation.")
+            raise last_exception
+        return wrapper
+    return decorator
