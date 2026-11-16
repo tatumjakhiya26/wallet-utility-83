@@ -1,36 +1,31 @@
+import time
 import logging
-from typing import Dict, List, Optional
+from typing import Callable, Any
 
-# Configure logging for wallet transaction monitoring
-logger = logging.getLogger('wallet-utility-83')
+logger = logging.getLogger(__name__)
 
-class TransactionProcessor:
-    """Handles batch processing of cryptocurrency transactions."""
+def with_retry(func: Callable, retries: int = 3, delay: float = 1.0) -> Any:
+    """Executes network operations with exponential backoff."""
+    last_exception = None
+    
+    for attempt in range(retries):
+        try:
+            return func()
+        except (ConnectionError, TimeoutError) as e:
+            last_exception = e
+            wait_time = delay * (2 ** attempt)
+            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except Exception as e:
+            logger.error(f"Non-retryable error encountered: {e}")
+            raise
+            
+    logger.error(f"Operation failed after {retries} attempts")
+    raise last_exception
 
-    def __init__(self, network_fee: float = 0.0001):
-        self.network_fee = network_fee
-
-    def validate_batch(self, transactions: List[Dict]) -> bool:
-        """Ensures all transactions in a batch have valid structures."""
-        return all(all(k in tx for k in ('address', 'amount')) for tx in transactions)
-
-    def calculate_net_total(self, transactions: List[Dict]) -> float:
-        """Sums transaction amounts and deducts standardized network fees."""
-        total = sum(tx.get('amount', 0) for tx in transactions)
-        fees = len(transactions) * self.network_fee
-        return round(total - fees, 8)
-
-    def process_queue(self, queue: List[Dict]) -> Optional[Dict]:
-        """Coordinates validation and net calculation for incoming batches."""
-        if not self.validate_batch(queue):
-            logger.error('Invalid transaction structure detected')
-            return None
-
-        net_amount = self.calculate_net_total(queue)
-        logger.info(f'Processed batch of {len(queue)} with net {net_amount}')
-        
-        return {
-            'status': 'success',
-            'count': len(queue),
-            'net_amount': net_amount
-        }
+def fetch_wallet_balance(api_client: Any, address: str) -> float:
+    """Wrapper to retrieve balance with resiliency."""
+    def operation():
+        return api_client.get_balance(address)
+    
+    return with_retry(operation)
