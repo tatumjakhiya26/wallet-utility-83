@@ -1,30 +1,28 @@
+from typing import Optional
+
 class WalletError(Exception):
-    """Base exception for wallet-utility-83 operations."""
-    pass
+    """Base exception class for wallet-utility-83 errors."""
+    def __init__(self, message: str, code: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 class InsufficientFundsError(WalletError):
-    """Raised when account balance is too low for transaction."""
+    """Raised when the wallet balance is too low for the transaction."""
+    pass
+
+class ConnectionTimeoutError(WalletError):
+    """Raised when the node connection times out."""
     pass
 
 class InvalidAddressError(WalletError):
-    """Raised when a crypto address format is invalid."""
-    pass
+    """Raised when a provided crypto address format is invalid."""
+    def __init__(self, address: str) -> None:
+        super().__init__(f"Invalid address format provided: {address}", code=400)
 
-class NetworkTimeoutError(WalletError):
-    """Raised when the blockchain node fails to respond."""
+class TransactionSigningError(WalletError):
+    """Raised when the signing process fails due to invalid keys."""
     pass
 
 class ConfigurationError(WalletError):
-    """Raised when required keys or environment variables are missing."""
+    """Raised when application settings are missing or misconfigured."""
     pass
-
-class TransactionSigningError(WalletError):
-    """Raised when cryptographic signing of a transaction fails."""
-    pass
-
-def handle_wallet_exception(err: Exception) -> None:
-    """Centralized error reporting utility."""
-    if isinstance(err, WalletError):
-        print(f"[Wallet Utility Error]: {str(err)}")
-    else:
-        print(f"[Unexpected System Error]: {str(err)}")
