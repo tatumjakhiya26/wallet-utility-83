@@ -1,48 +1,33 @@
-from typing import Optional, Dict, Any
-import hashlib
-import hmac
+import time
+import functools
+import logging
+from typing import Callable, Any
 
-def generate_signature(api_secret: str, payload: str) -> str:
-    """
-    Generates an HMAC-SHA256 signature for API requests.
+logger = logging.getLogger(__name__)
 
-    Args:
-        api_secret: The private key for the wallet account.
-        payload: The JSON-encoded request body or parameters.
+def with_retry(retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == retries - 1:
+                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
+                        raise
+                    
+                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
 
-    Returns:
-        A hex-encoded signature string.
-    """
-    return hmac.new(
-        api_secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-
-def format_currency(amount: float, precision: int = 8) -> str:
-    """
-    Formats float crypto amounts to standardized decimal strings.
-
-    Args:
-        amount: The numerical value to format.
-        precision: The number of decimal places allowed.
-
-    Returns:
-        String representation of the amount with fixed precision.
-    """
-    return f"{amount:.{precision}f}"
-
-def validate_address(address: str, chain: str = 'BTC') -> bool:
-    """
-    Checks if a wallet address follows expected format conventions.
-
-    Args:
-        address: The string address to validate.
-        chain: The identifier for the blockchain network.
-
-    Returns:
-        Boolean indicating format validity.
-    """
-    if chain == 'BTC':
-        return len(address) in range(26, 36) and address.isalnum()
-    return len(address) == 42 and address.startswith('0x')
+# Usage example for wallet RPC calls
+@with_retry(retries=3, delay=2.0)
+def fetch_balance(wallet_address: str):
+    """Simulated network call to crypto node."""
+    # Logic for RPC call goes here
+    pass
