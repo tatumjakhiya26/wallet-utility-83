@@ -1,40 +1,35 @@
+import time
 import logging
-from decimal import Decimal, InvalidOperation
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
-def sanitize_amount(amount_str: str) -> Decimal:
-    """Converts string input to Decimal with robust error handling."""
-    try:
-        if not amount_str:
-            raise ValueError("Amount string is empty")
-        
-        amount = Decimal(str(amount_str))
-        
-        if amount < 0:
-            raise ValueError(f"Negative amount provided: {amount}")
-            
-        return amount
-    except (InvalidOperation, ValueError) as e:
-        logger.error(f"Invalid crypto amount format: {amount_str} - {str(e)}")
-        raise ValueError("Invalid financial amount format")
+def format_address(address: str) -> str:
+    """Truncate crypto address for display."""
+    if len(address) > 12:
+        return f"{address[:6]}...{address[-4:]}"
+    return address
 
-def validate_address(address: str, expected_prefix: str = "0x") -> bool:
-    """Checks basic wallet address structure."""
-    if not isinstance(address, str):
-        return False
-    
-    # Check length and prefix for typical EVM-like addresses
-    if len(address) != 42 or not address.startswith(expected_prefix):
-        logger.warning(f"Malformed address detected: {address}")
-        return False
-        
-    return all(c in "0123456789abcdefABCDEF" for c in address[2:])
+def validate_gas_price(price_gwei: float) -> bool:
+    """Ensure gas prices are within sane network limits."""
+    return 0.1 <= price_gwei <= 1000.0
 
-def format_crypto_display(amount: Decimal, precision: int = 8) -> str:
-    """Formats decimal to string for UI display."""
-    try:
-        return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
-    except (TypeError, ValueError) as e:
-        logger.exception("Formatting error in crypto display")
-        return "0.00"
+def retry_on_failure(retries: int = 3, delay: float = 1.0):
+    """Decorator for transient network request retries."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            last_ex = None
+            for i in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_ex = e
+                    time.sleep(delay * (i + 1))
+            logger.error(f"Failed after {retries} attempts: {last_ex}")
+            raise last_ex
+        return wrapper
+    return decorator
+
+def sanitize_tx_data(data: Dict) -> Dict:
+    """Remove empty or null fields from transaction payload."""
+    return {k: v for k, v in data.items() if v is not None}
