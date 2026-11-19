@@ -1,30 +1,40 @@
-import time
-import functools
 import logging
-from typing import Callable, Any
+from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger(__name__)
 
-def retry_network_op(retries: int = 3, backoff: float = 2.0):
-    """
-    Decorator for retrying network operations with exponential backoff.
-    """
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            delay = 1.0
+def sanitize_amount(amount_str: str) -> Decimal:
+    """Converts string input to Decimal with robust error handling."""
+    try:
+        if not amount_str:
+            raise ValueError("Amount string is empty")
+        
+        amount = Decimal(str(amount_str))
+        
+        if amount < 0:
+            raise ValueError(f"Negative amount provided: {amount}")
             
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
-                    time.sleep(delay)
-                    delay *= backoff
-            
-            logger.error("Max retries exceeded for network operation.")
-            raise last_exception
-        return wrapper
-    return decorator
+        return amount
+    except (InvalidOperation, ValueError) as e:
+        logger.error(f"Invalid crypto amount format: {amount_str} - {str(e)}")
+        raise ValueError("Invalid financial amount format")
+
+def validate_address(address: str, expected_prefix: str = "0x") -> bool:
+    """Checks basic wallet address structure."""
+    if not isinstance(address, str):
+        return False
+    
+    # Check length and prefix for typical EVM-like addresses
+    if len(address) != 42 or not address.startswith(expected_prefix):
+        logger.warning(f"Malformed address detected: {address}")
+        return False
+        
+    return all(c in "0123456789abcdefABCDEF" for c in address[2:])
+
+def format_crypto_display(amount: Decimal, precision: int = 8) -> str:
+    """Formats decimal to string for UI display."""
+    try:
+        return f"{amount:.{precision}f}".rstrip('0').rstrip('.')
+    except (TypeError, ValueError) as e:
+        logger.exception("Formatting error in crypto display")
+        return "0.00"
