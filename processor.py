@@ -1,31 +1,31 @@
-import time
-import logging
-from typing import Callable, Any
+from typing import List, Dict, Optional, Union
 
-logger = logging.getLogger(__name__)
+class TransactionProcessor:
+    """Handles crypto transaction validation and normalization."""
 
-def with_retry(func: Callable, retries: int = 3, delay: float = 1.0) -> Any:
-    """Executes network operations with exponential backoff."""
-    last_exception = None
-    
-    for attempt in range(retries):
-        try:
-            return func()
-        except (ConnectionError, TimeoutError) as e:
-            last_exception = e
-            wait_time = delay * (2 ** attempt)
-            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
-            time.sleep(wait_time)
-        except Exception as e:
-            logger.error(f"Non-retryable error encountered: {e}")
-            raise
+    def __init__(self, network: str = "mainnet") -> None:
+        self.network = network
+
+    def validate_address(self, address: str) -> bool:
+        """Verify basic crypto address format integrity."""
+        return len(address) > 25 and address.isalnum()
+
+    def process_batch(self, transactions: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Optional[bool]]]:
+        """Validates a list of transactions against network rules."""
+        results = []
+        for tx in transactions:
+            address = str(tx.get("address", ""))
+            amount = float(tx.get("amount", 0))
             
-    logger.error(f"Operation failed after {retries} attempts")
-    raise last_exception
+            is_valid = self.validate_address(address) and amount > 0
+            results.append({
+                "tx_id": tx.get("id"),
+                "status": "success" if is_valid else "failed"
+            })
+        return results
 
-def fetch_wallet_balance(api_client: Any, address: str) -> float:
-    """Wrapper to retrieve balance with resiliency."""
-    def operation():
-        return api_client.get_balance(address)
-    
-    return with_retry(operation)
+    def get_summary(self, processed: List[Dict]) -> Dict[str, int]:
+        """Aggregate report of processing results."""
+        total = len(processed)
+        successes = sum(1 for item in processed if item["status"] == "success")
+        return {"total": total, "success": successes, "failure": total - successes}
