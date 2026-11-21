@@ -1,34 +1,36 @@
 import re
 
-# regex patterns for cryptocurrency wallet addresses
-VALID_ADDRESS_PATTERNS = {
-    'BTC': r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$',
-    'ETH': r'^0x[a-fA-F0-9]{40}$',
-    'SOL': r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
-}
+class ValidationError(Exception):
+    """Base class for validation errors in wallet-utility-83."""
+    pass
 
-def validate_wallet_address(address: str, chain: str) -> bool:
-    """Checks if a wallet address matches the target chain format."""
-    pattern = VALID_ADDRESS_PATTERNS.get(chain)
+def validate_address(address: str, chain_type: str = 'eth') -> bool:
+    """Validates cryptocurrency addresses for supported networks."""
+    if not isinstance(address, str):
+        raise ValidationError("Address must be a string.")
+
+    patterns = {
+        'eth': r'^0x[a-fA-F0-9]{40}$',
+        'btc': r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$'
+    }
+
+    pattern = patterns.get(chain_type.lower())
     if not pattern:
-        raise ValueError(f"Unsupported chain type: {chain}")
-    
-    return bool(re.match(pattern, address))
+        raise ValidationError(f"Unsupported chain type: {chain_type}")
 
-def validate_transaction_amount(amount: float) -> bool:
-    """Ensures transaction amount is positive and within limits."""
-    return isinstance(amount, (int, float)) and 0 < amount < 1000000.0
+    if not re.match(pattern, address):
+        raise ValidationError(f"Invalid {chain_type} address format: {address}")
 
-def validate_input_data(data: dict) -> bool:
-    """General input validation for processing loop."""
-    required_keys = ['address', 'amount', 'chain']
-    if not all(key in data for key in required_keys):
-        return False
-        
-    if not validate_wallet_address(data['address'], data['chain']):
-        return False
-        
-    if not validate_transaction_amount(data['amount']):
-        return False
-        
+    return True
+
+def validate_amount(amount: float) -> bool:
+    """Checks if the transaction amount is positive and finite."""
+    try:
+        if amount <= 0:
+            raise ValidationError("Transaction amount must be positive.")
+        if not float(amount): 
+            raise ValidationError("Amount must be a valid numeric value.")
+    except (TypeError, ValueError):
+        raise ValidationError("Invalid numeric input for transaction amount.")
+
     return True
